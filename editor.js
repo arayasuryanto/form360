@@ -33,10 +33,19 @@ const respondentsModal = document.getElementById('respondentsModal');
 document.addEventListener('DOMContentLoaded', init);
 
 function init() {
-    if (window.supabase) {
-        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    try {
+        if (window.supabase && typeof window.supabase.createClient === 'function') {
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        }
+    } catch (e) {
+        console.error('Supabase init error:', e);
     }
-    loadForms();
+    try {
+        loadForms();
+    } catch (e) {
+        console.error('loadForms error:', e);
+        forms = [createNewFormData()];
+    }
     setupEventListeners();
     renderFormList();
 }
@@ -98,49 +107,36 @@ function createQuestionData(id, type = 'multiple_choice') {
     return base;
 }
 
+function bind(id, event, fn) {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener(event, fn);
+}
+
 function setupEventListeners() {
-    // Sidebar
-    document.getElementById('newFormBtn').addEventListener('click', showNewFormModal);
-    document.getElementById('previewBtn').addEventListener('click', showPreview);
-    document.getElementById('saveBtn').addEventListener('click', saveCurrentForm);
+    bind('newFormBtn', 'click', showNewFormModal);
+    bind('previewBtn', 'click', showPreview);
+    bind('saveBtn', 'click', saveCurrentForm);
+    bind('addQuestionBtn', 'click', addQuestion);
+    bind('cancelNewForm', 'click', hideNewFormModal);
+    bind('confirmNewForm', 'click', createNewForm);
+    bind('cancelDelete', 'click', hideDeleteModal);
+    bind('confirmDelete', 'click', confirmDelete);
+    bind('closePreview', 'click', hidePreview);
+    bind('closeRespondents', 'click', hideRespondentsModal);
+    bind('shareBtn', 'click', showShareModal);
+    bind('copyLinkBtn', 'click', copyShareLink);
+    bind('closeShareModal', 'click', hideShareModal);
 
-    // Form settings
-    formNameInput.addEventListener('input', updateFormSetting);
-    formDescriptionInput.addEventListener('input', updateFormSetting);
-    welcomeTitleInput.addEventListener('input', updateFormSetting);
-    welcomeSubtitleInput.addEventListener('input', updateFormSetting);
-    resultsTitleInput.addEventListener('input', updateFormSetting);
-    resultsSubtitleInput.addEventListener('input', updateFormSetting);
-    resultsButtonTextInput.addEventListener('input', updateFormSetting);
+    if (formNameInput) formNameInput.addEventListener('input', updateFormSetting);
+    if (formDescriptionInput) formDescriptionInput.addEventListener('input', updateFormSetting);
+    if (welcomeTitleInput) welcomeTitleInput.addEventListener('input', updateFormSetting);
+    if (welcomeSubtitleInput) welcomeSubtitleInput.addEventListener('input', updateFormSetting);
+    if (resultsTitleInput) resultsTitleInput.addEventListener('input', updateFormSetting);
+    if (resultsSubtitleInput) resultsSubtitleInput.addEventListener('input', updateFormSetting);
+    if (resultsButtonTextInput) resultsButtonTextInput.addEventListener('input', updateFormSetting);
 
-    // Questions
-    document.getElementById('addQuestionBtn').addEventListener('click', addQuestion);
-
-    // New form modal
-    document.getElementById('cancelNewForm').addEventListener('click', hideNewFormModal);
-    document.getElementById('confirmNewForm').addEventListener('click', createNewForm);
-
-    // Delete modal
-    document.getElementById('cancelDelete').addEventListener('click', hideDeleteModal);
-    document.getElementById('confirmDelete').addEventListener('click', confirmDelete);
-
-    // Preview modal
-    document.getElementById('closePreview').addEventListener('click', hidePreview);
-    previewModal.addEventListener('click', (e) => {
-        if (e.target === previewModal) hidePreview();
-    });
-
-    // Respondents modal
-    document.getElementById('closeRespondents').addEventListener('click', hideRespondentsModal);
-    respondentsModal.addEventListener('click', (e) => {
-        if (e.target === respondentsModal) hideRespondentsModal();
-    });
-
-    // Share button
-    const shareBtn = document.getElementById('shareBtn');
-    shareBtn.addEventListener('click', showShareModal);
-    document.getElementById('copyLinkBtn').addEventListener('click', copyShareLink);
-    document.getElementById('closeShareModal').addEventListener('click', hideShareModal);
+    if (previewModal) previewModal.addEventListener('click', (e) => { if (e.target === previewModal) hidePreview(); });
+    if (respondentsModal) respondentsModal.addEventListener('click', (e) => { if (e.target === respondentsModal) hideRespondentsModal(); });
 }
 
 function showNewFormModal() {
