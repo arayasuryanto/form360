@@ -1,5 +1,9 @@
 // Form Editor JavaScript
 
+const SUPABASE_URL = 'https://ientctrogwvbjyznyvie.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_ro6aUrWPrD72pa2qN4I7JQ_JHC8zneU';
+let supabase = null;
+
 // State
 let forms = [];
 let currentFormId = null;
@@ -29,6 +33,9 @@ const respondentsModal = document.getElementById('respondentsModal');
 document.addEventListener('DOMContentLoaded', init);
 
 function init() {
+    if (window.supabase) {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    }
     loadForms();
     setupEventListeners();
     renderFormList();
@@ -195,17 +202,33 @@ function hidePreview() {
     previewFrame.src = '';
 }
 
-function showShareModal() {
+async function showShareModal() {
     const form = getCurrentForm();
     if (!form) return;
 
-    // Generate share link with base64-encoded form data
-    // This way it works even if user opens in different browser
-    const formJson = JSON.stringify(form);
-    const encodedData = btoa(formJson);
-    // Use encodeURIComponent to ensure + and other chars are preserved
+    const shareBtn = document.getElementById('shareBtn');
+    const originalHtml = shareBtn.innerHTML;
+    shareBtn.innerHTML = 'Menyimpan...';
+    shareBtn.disabled = true;
+
     const baseUrl = window.location.origin + window.location.pathname.replace('editor.html', 'index.html');
-    const shareLink = `${baseUrl}?data=${encodeURIComponent(encodedData)}`;
+    let shareLink;
+
+    // Save to Supabase for a clean UUID-based link
+    const supabaseId = await saveFormToSupabase(form);
+    saveForms();
+
+    if (supabaseId) {
+        shareLink = `${baseUrl}?form=${supabaseId}`;
+    } else {
+        // Fallback: Unicode-safe base64 URL
+        const formJson = JSON.stringify(form);
+        const encodedData = btoa(unescape(encodeURIComponent(formJson)));
+        shareLink = `${baseUrl}?data=${encodeURIComponent(encodedData)}`;
+    }
+
+    shareBtn.innerHTML = originalHtml;
+    shareBtn.disabled = false;
 
     document.getElementById('shareLink').value = shareLink;
     document.getElementById('shareModal').classList.add('active');
@@ -614,9 +637,82 @@ function deleteOption(questionId, optionIndex) {
     }
 }
 
-function saveCurrentForm() {
+async function saveFormToSupabase(form) {
+    if (!supabase) return null;
+    try {
+        const formData = {
+            name: form.name || 'Form Baru',
+            description: form.description || '',
+            welcome_title: form.welcome.title,
+            welcome_subtitle: form.welcome.subtitle,
+            results_title: form.results.title,
+            results_subtitle: form.results.subtitle,
+            results_button_text: form.results.buttonText
+        };
+
+        let supabaseId = form.supabaseId;
+        if (supabaseId) {
+            const { error } = await supabase.from('forms').update(formData).eq('id', supabaseId);
+            if (error) throw error;
+        } else {
+            const { data, error } = await supabase.from('forms').insert(formData).select().single();
+            if (error) throw error;
+            supabaseId = data.id;
+            form.supabaseId = supabaseId;
+        }
+
+        // Replace questions: delete old, insert new
+        await supabase.from('questions').delete().eq('form_id', supabaseId);
+        const questionsToInsert = form.questions.map((q, i) => ({
+            form_id: supabaseId,
+            question_order: i + 1,
+            question_type: q.type,
+            title: q.title,
+            placeholder: q.placeholder || null,
+            options: q.options ? JSON.stringify(q.options) : null
+        }));
+        if (questionsToInsert.length > 0) {
+            const { data: qData, error: qErr } = await supabase.from('questions').insert(questionsToInsert).select();
+            if (qErr) throw qErr;
+            // Map local question IDs to Supabase UUIDs for response linking
+            form.supabaseQuestionIds = {};
+            (qData || []).forEach((sq, i) => {
+                form.supabaseQuestionIds[form.questions[i].id] = sq.id;
+            });
+        }
+
+        return supabaseId;
+    } catch (e) {
+        console.error('Supabase save error:', e);
+        return null;
+    }
+}
+
+function showToast(message, isError = false) {
+    const existing = document.getElementById('editor-toast');
+    if (existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.id = 'editor-toast';
+    toast.style.cssText = `position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:${isError ? '#c0392b' : '#2e7d32'};color:#fff;padding:10px 20px;border-radius:8px;font-size:14px;z-index:9999;pointer-events:none`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2500);
+}
+
+async function saveCurrentForm() {
     updateFormSetting();
     saveForms();
+    const form = getCurrentForm();
+    if (!form) return;
+    const saveBtn = document.getElementById('saveBtn');
+    const original = saveBtn.textContent;
+    saveBtn.textContent = 'Menyimpan...';
+    saveBtn.disabled = true;
+    const id = await saveFormToSupabase(form);
+    saveForms(); // persist supabaseId back to localStorage
+    saveBtn.textContent = original;
+    saveBtn.disabled = false;
+    showToast(id ? 'Form tersimpan!' : 'Tersimpan lokal (Supabase gagal)');
 }
 
 // Make functions available globally

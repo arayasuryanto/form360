@@ -24,9 +24,8 @@ let isTransitioning = false;
 let startTime = null;
 let useSupabase = false;
 
-// Supabase config - reads from window.ENV set by Netlify
-const SUPABASE_URL = (window.ENV && window.ENV.VITE_SUPABASE_URL) || '';
-const SUPABASE_KEY = (window.ENV && window.ENV.VITE_SUPABASE_ANON_KEY) || '';
+const SUPABASE_URL = 'https://ientctrogwvbjyznyvie.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_ro6aUrWPrD72pa2qN4I7JQ_JHC8zneU';
 let supabase = null;
 
 // DOM Elements
@@ -87,7 +86,7 @@ async function init() {
     if (questions.length === 0 && formDataParam) {
         try {
             const urlDecoded = decodeURIComponent(formDataParam);
-            const decoded = atob(urlDecoded);
+            const decoded = decodeURIComponent(escape(atob(urlDecoded)));
             const formData = JSON.parse(decoded);
             currentFormId = formData.id;
             questions = formData.questions || [];
@@ -98,7 +97,7 @@ async function init() {
         } catch (e) {
             console.error('URL decode failed:', e);
             try {
-                const altDecoded = atob(formDataParam.replace(/ /g, '+'));
+                const altDecoded = decodeURIComponent(escape(atob(formDataParam.replace(/ /g, '+'))));
                 const formData = JSON.parse(altDecoded);
                 currentFormId = formData.id;
                 questions = formData.questions || [];
@@ -197,7 +196,7 @@ async function saveResponseToSupabase(timeTaken, answersArray) {
             .select()
             .single();
 
-        if (error) throw respError;
+        if (respError) throw respError;
 
         // Insert answers
         const answersToInsert = answersArray.map(a => ({
