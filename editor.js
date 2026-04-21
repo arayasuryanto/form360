@@ -299,7 +299,10 @@ function showDeleteFormModal(formId) {
         msgEl.textContent = `Hapus "${form.name || 'Tanpa Nama'}"? Data responden akan tetap tersimpan.`;
     }
     const modal = document.getElementById('deleteFormModal');
-    if (modal) modal.classList.add('active');
+    if (modal) {
+        modal.classList.add('active');
+        modal.style.cssText = 'display:flex !important;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center;';
+    }
 }
 
 function cancelDeleteForm() {
@@ -309,6 +312,7 @@ function cancelDeleteForm() {
 }
 
 async function confirmDeleteForm() {
+    console.log('confirmDeleteForm running, formToDelete:', formToDelete, 'forms count before:', forms.length);
     if (!formToDelete) return;
     const form = forms.find(f => f.id === formToDelete);
     if (form && form.supabaseId && sbClient) {
@@ -325,7 +329,12 @@ async function confirmDeleteForm() {
     formToDelete = null;
     saveForms();
     const m = document.getElementById('deleteFormModal');
-    if (m) m.classList.remove('active');
+    if (m) {
+        m.classList.remove('active');
+        m.style.cssText = '';
+    }
+    console.log('confirmDeleteForm done, forms count after:', forms.length);
+    showToast('Form dihapus');
     renderFormList();
     if (currentFormId) selectForm(currentFormId);
 }
