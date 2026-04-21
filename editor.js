@@ -75,6 +75,10 @@ async function loadForms() {
 
                     // Fetch its questions
                     fetchQuestionsForForm(rf.id).then(questions => {
+                        // Build supabaseQuestionIds map: local id → supabase UUID
+                        const qIdMap = {};
+                        questions.forEach(q => { qIdMap[q.id] = q.supabaseQId; });
+
                         const localForm = {
                             id: rf.id,            // use supabase UUID as local id for consistency
                             supabaseId: rf.id,
@@ -89,7 +93,8 @@ async function loadForms() {
                                 subtitle: rf.results_subtitle || 'Kamu telah menyelesaikan form ini',
                                 buttonText: rf.results_button_text || 'Ikuti Lagi'
                             },
-                            questions: questions
+                            questions: questions,
+                            supabaseQuestionIds: qIdMap
                         };
                         forms.push(localForm);
                         saveForms();
@@ -115,6 +120,7 @@ async function fetchQuestionsForForm(supabaseFormId) {
         return (data || []).map((q, i) => {
             const base = {
                 id: i + 1,
+                supabaseQId: q.id,        // keep supabase UUID for answer mapping
                 type: q.question_type,
                 title: q.title || '',
                 placeholder: q.placeholder || ''
