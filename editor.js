@@ -32,7 +32,7 @@ const respondentsModal = document.getElementById('respondentsModal');
 // Initialize
 document.addEventListener('DOMContentLoaded', init);
 
-function init() {
+async function init() {
     try {
         if (window.supabase && typeof window.supabase.createClient === 'function') {
             sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -41,7 +41,7 @@ function init() {
         console.error('Supabase init error:', e);
     }
     try {
-        loadForms();
+        await loadForms();
     } catch (e) {
         console.error('loadForms error:', e);
         forms = [createNewFormData()];
@@ -50,13 +50,83 @@ function init() {
     renderFormList();
 }
 
-function loadForms() {
+async function loadForms() {
+    // Load local first so editor is responsive immediately
     const saved = localStorage.getItem('form360_forms');
     if (saved) {
         forms = JSON.parse(saved);
     } else {
-        // Create a default form
         forms = [createNewFormData()];
+    }
+
+    // Sync from Supabase: pull any forms saved by other editors
+    if (sbClient) {
+        try {
+            const { data: remoteForms, error } = await sbClient
+                .from('forms')
+                .select('*')
+                .order('created_at', { ascending: true });
+
+            if (!error && remoteForms && remoteForms.length > 0) {
+                remoteForms.forEach(rf => {
+                    // Skip if we already have this form (matched by supabaseId)
+                    const alreadyHave = forms.some(f => f.supabaseId === rf.id);
+                    if (alreadyHave) return;
+
+                    // Fetch its questions
+                    fetchQuestionsForForm(rf.id).then(questions => {
+                        const localForm = {
+                            id: rf.id,            // use supabase UUID as local id for consistency
+                            supabaseId: rf.id,
+                            name: rf.name || 'Tanpa Nama',
+                            description: rf.description || '',
+                            welcome: {
+                                title: rf.welcome_title || 'Halo, Selamat Datang!',
+                                subtitle: rf.welcome_subtitle || 'Tekan Mulai atau Enter untuk memulai'
+                            },
+                            results: {
+                                title: rf.results_title || 'Terima Kasih!',
+                                subtitle: rf.results_subtitle || 'Kamu telah menyelesaikan form ini',
+                                buttonText: rf.results_button_text || 'Ikuti Lagi'
+                            },
+                            questions: questions
+                        };
+                        forms.push(localForm);
+                        saveForms();
+                        renderFormList();
+                    });
+                });
+            }
+        } catch (e) {
+            console.error('loadForms Supabase sync error:', e);
+        }
+    }
+}
+
+async function fetchQuestionsForForm(supabaseFormId) {
+    if (!sbClient) return [];
+    try {
+        const { data, error } = await sbClient
+            .from('questions')
+            .select('*')
+            .eq('form_id', supabaseFormId)
+            .order('question_order', { ascending: true });
+        if (error) throw error;
+        return (data || []).map((q, i) => {
+            const base = {
+                id: i + 1,
+                type: q.question_type,
+                title: q.title || '',
+                placeholder: q.placeholder || ''
+            };
+            if (q.question_type === 'multiple_choice' && q.options) {
+                base.options = typeof q.options === 'string' ? JSON.parse(q.options) : q.options;
+            }
+            return base;
+        });
+    } catch (e) {
+        console.error('fetchQuestionsForForm error:', e);
+        return [];
     }
 }
 
