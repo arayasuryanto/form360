@@ -26,7 +26,7 @@ let useSupabase = false;
 
 const SUPABASE_URL = 'https://ientctrogwvbjyznyvie.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_ro6aUrWPrD72pa2qN4I7JQ_JHC8zneU';
-let supabase = null;
+let sbClient = null;
 
 // DOM Elements
 let dynamicStepper;
@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', init);
 async function init() {
     // Initialize Supabase if configured
     if (SUPABASE_URL && SUPABASE_KEY && window.supabase) {
-        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         useSupabase = true;
     }
 
@@ -153,10 +153,10 @@ async function init() {
 
 // Supabase Functions
 async function getFormFromSupabase(formId) {
-    if (!supabase) return null;
+    if (!sbClient) return null;
 
     try {
-        const { data, error } = await supabase
+        const { data, error } = await sbClient
             .from('forms')
             .select('*')
             .eq('id', formId)
@@ -164,7 +164,7 @@ async function getFormFromSupabase(formId) {
 
         if (error || !data) return null;
 
-        const { data: questionsData, error: qError } = await supabase
+        const { data: questionsData, error: qError } = await sbClient
             .from('questions')
             .select('*')
             .eq('form_id', formId)
@@ -186,11 +186,11 @@ async function getFormFromSupabase(formId) {
 }
 
 async function saveResponseToSupabase(timeTaken, answersArray) {
-    if (!supabase) return false;
+    if (!sbClient) return false;
 
     try {
         // Insert response
-        const { data: response, error: respError } = await supabase
+        const { data: response, error: respError } = await sbClient
             .from('responses')
             .insert({ form_id: currentFormId, time_taken: timeTaken })
             .select()
@@ -205,7 +205,7 @@ async function saveResponseToSupabase(timeTaken, answersArray) {
             answer_value: a.answer
         }));
 
-        await supabase.from('answers').insert(answersToInsert);
+        await sbClient.from('answers').insert(answersToInsert);
         return true;
     } catch (e) {
         console.error('Save response error:', e);

@@ -2,7 +2,7 @@
 
 const SUPABASE_URL = 'https://ientctrogwvbjyznyvie.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_ro6aUrWPrD72pa2qN4I7JQ_JHC8zneU';
-let supabase = null;
+let sbClient = null;
 
 // State
 let forms = [];
@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', init);
 function init() {
     try {
         if (window.supabase && typeof window.supabase.createClient === 'function') {
-            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         }
     } catch (e) {
         console.error('Supabase init error:', e);
@@ -634,7 +634,7 @@ function deleteOption(questionId, optionIndex) {
 }
 
 async function saveFormToSupabase(form) {
-    if (!supabase) return null;
+    if (!sbClient) return null;
     try {
         const formData = {
             name: form.name || 'Form Baru',
@@ -648,17 +648,17 @@ async function saveFormToSupabase(form) {
 
         let supabaseId = form.supabaseId;
         if (supabaseId) {
-            const { error } = await supabase.from('forms').update(formData).eq('id', supabaseId);
+            const { error } = await sbClient.from('forms').update(formData).eq('id', supabaseId);
             if (error) throw error;
         } else {
-            const { data, error } = await supabase.from('forms').insert(formData).select().single();
+            const { data, error } = await sbClient.from('forms').insert(formData).select().single();
             if (error) throw error;
             supabaseId = data.id;
             form.supabaseId = supabaseId;
         }
 
         // Replace questions: delete old, insert new
-        await supabase.from('questions').delete().eq('form_id', supabaseId);
+        await sbClient.from('questions').delete().eq('form_id', supabaseId);
         const questionsToInsert = form.questions.map((q, i) => ({
             form_id: supabaseId,
             question_order: i + 1,
@@ -668,7 +668,7 @@ async function saveFormToSupabase(form) {
             options: q.options ? JSON.stringify(q.options) : null
         }));
         if (questionsToInsert.length > 0) {
-            const { data: qData, error: qErr } = await supabase.from('questions').insert(questionsToInsert).select();
+            const { data: qData, error: qErr } = await sbClient.from('questions').insert(questionsToInsert).select();
             if (qErr) throw qErr;
             // Map local question IDs to Supabase UUIDs for response linking
             form.supabaseQuestionIds = {};
