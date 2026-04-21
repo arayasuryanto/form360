@@ -229,6 +229,29 @@ function setupEventListeners() {
 
     if (previewModal) previewModal.addEventListener('click', (e) => { if (e.target === previewModal) hidePreview(); });
     if (respondentsModal) respondentsModal.addEventListener('click', (e) => { if (e.target === respondentsModal) hideRespondentsModal(); });
+
+    // Event delegation for form list buttons — survives re-renders
+    if (formList) {
+        formList.addEventListener('click', function(e) {
+            const btn = e.target.closest('.icon-btn');
+            if (btn) {
+                e.stopPropagation();
+                e.preventDefault();
+                const formItem = btn.closest('.form-item');
+                if (!formItem) return;
+                const formId = formItem.getAttribute('data-form-id');
+                if (btn.classList.contains('export-btn')) { downloadFormExcel(formId); return; }
+                if (btn.classList.contains('view-btn')) { showRespondentsModal(formId); return; }
+                if (btn.classList.contains('delete-btn')) { showDeleteFormModal(formId); return; }
+            }
+            // Click on form-item-main selects the form
+            const main = e.target.closest('.form-item-main');
+            if (main) {
+                const formItem = main.closest('.form-item');
+                if (formItem) selectForm(formItem.getAttribute('data-form-id'));
+            }
+        });
+    }
 }
 
 function showNewFormModal() {
@@ -275,24 +298,24 @@ function confirmDelete() {
 }
 
 function showDeleteFormModal(formId) {
+    console.log('[DEBUG] showDeleteFormModal called with:', formId);
     const form = forms.find(f => f.id === formId);
-    if (!form) return;
+    if (!form) { console.log('[DEBUG] form not found'); return; }
     formToDelete = formId;
     const msgEl = document.getElementById('deleteFormMsg');
     if (msgEl) {
-        msgEl.textContent = `Hapus "${form.name || 'Tanpa Nama'}"? Data responden akan tetap tersimpan.`;
+        msgEl.textContent = 'Hapus "' + (form.name || 'Tanpa Nama') + '"? Data responden akan tetap tersimpan.';
     }
     const modal = document.getElementById('deleteFormModal');
     if (modal) {
         modal.classList.add('active');
-        modal.style.cssText = 'display:flex !important;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center;';
     }
 }
 
 function cancelDeleteForm() {
     formToDelete = null;
     const m = document.getElementById('deleteFormModal');
-    if (m) m.classList.remove('active');
+    if (m) { m.classList.remove('active'); m.style.cssText = ''; }
 }
 
 async function confirmDeleteForm() {
@@ -730,17 +753,7 @@ function renderFormList() {
         `;
     }).join('');
 
-    // Wire up click handlers directly to buttons after render
-    formList.querySelectorAll('.form-item').forEach(item => {
-        const formId = item.getAttribute('data-form-id');
-        item.querySelector('.form-item-main').addEventListener('click', () => selectForm(formId));
-        const exportBtn = item.querySelector('.export-btn');
-        const viewBtn = item.querySelector('.view-btn');
-        const deleteBtn = item.querySelector('.delete-btn');
-        if (exportBtn) exportBtn.addEventListener('click', e => { e.stopPropagation(); downloadFormExcel(formId); });
-        if (viewBtn) viewBtn.addEventListener('click', e => { e.stopPropagation(); showRespondentsModal(formId); });
-        if (deleteBtn) deleteBtn.addEventListener('click', e => { e.stopPropagation(); showDeleteFormModal(formId); });
-    });
+    // Buttons are handled via event delegation in setupEventListeners
 
     // Auto-select first form if none selected
     if (!currentFormId && forms.length > 0) {

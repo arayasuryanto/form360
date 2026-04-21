@@ -616,6 +616,12 @@
     cursor: pointer;
     color: var(--text-secondary);
     transition: all 0.2s ease;
+    position: relative;
+    z-index: 1;
+}
+
+.icon-btn svg {
+    pointer-events: none;
 }
 
 .icon-btn:hover {
