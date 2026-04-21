@@ -69,11 +69,24 @@ async function loadForms() {
 
             if (!error && remoteForms && remoteForms.length > 0) {
                 remoteForms.forEach(rf => {
-                    // Skip if we already have this form (matched by supabaseId)
-                    const alreadyHave = forms.some(f => f.supabaseId === rf.id);
-                    if (alreadyHave) return;
+                    const existingForm = forms.find(f => f.supabaseId === rf.id);
 
-                    // Fetch its questions
+                    if (existingForm) {
+                        // Form exists but may be missing supabaseQuestionIds — rebuild it
+                        if (!existingForm.supabaseQuestionIds) {
+                            fetchQuestionsForForm(rf.id).then(questions => {
+                                existingForm.questions = questions;
+                                existingForm.supabaseQuestionIds = {};
+                                questions.forEach(q => { existingForm.supabaseQuestionIds[q.id] = q.supabaseQId; });
+                                existingForm.supabaseId = rf.id;
+                                saveForms();
+                                renderFormList();
+                            });
+                        }
+                        return;
+                    }
+
+                    // Brand new form — create from scratch
                     fetchQuestionsForForm(rf.id).then(questions => {
                         // Build supabaseQuestionIds map: local id → supabase UUID
                         const qIdMap = {};
@@ -401,8 +414,17 @@ async function showRespondentDetail(formId, respondentId) {
         const rawAnswers = await fetchAnswersFromSupabase(respondentId);
         rawAnswers.forEach(a => { answersMap[a.question_id] = a.answer_value; });
 
-        // Build reverse map: local question id → supabase uuid
-        const qIdMap = form.supabaseQuestionIds || {};
+        // Build qIdMap: local question id → supabase uuid
+        // If supabaseQuestionIds is missing/empty, rebuild it on the fly
+        let qIdMap = form.supabaseQuestionIds;
+        if (!qIdMap || Object.keys(qIdMap).length === 0) {
+            qIdMap = {};
+            const remoteQuestions = await fetchQuestionsForForm(form.supabaseId);
+            remoteQuestions.forEach(q => { qIdMap[q.id] = q.supabaseQId; });
+            form.supabaseQuestionIds = qIdMap;
+            form.questions = remoteQuestions;
+            saveForms();
+        }
 
         answersContainer.innerHTML = form.questions.map((q, i) => {
             const supabaseQId = qIdMap[q.id];
