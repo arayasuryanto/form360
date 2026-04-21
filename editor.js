@@ -291,23 +291,24 @@ function confirmDelete() {
 }
 
 function showDeleteFormModal(formId) {
-    console.log('[DEBUG] showDeleteFormModal called, formId:', formId);
     const form = forms.find(f => f.id === formId);
-    if (!form) { console.log('[DEBUG] form not found!'); return; }
+    if (!form) return;
     formToDelete = formId;
-    document.getElementById('deleteFormMsg').textContent =
-        `Hapus "${form.name || 'Tanpa Nama'}"? Data responden akan tetap tersimpan.`;
-    document.getElementById('deleteFormModal').classList.add('active');
-    console.log('[DEBUG] modal should now be visible, classList:', document.getElementById('deleteFormModal').classList.contains('active'));
+    const msgEl = document.getElementById('deleteFormMsg');
+    if (msgEl) {
+        msgEl.textContent = `Hapus "${form.name || 'Tanpa Nama'}"? Data responden akan tetap tersimpan.`;
+    }
+    const modal = document.getElementById('deleteFormModal');
+    if (modal) modal.classList.add('active');
 }
 
 function cancelDeleteForm() {
     formToDelete = null;
-    document.getElementById('deleteFormModal').classList.remove('active');
+    const m = document.getElementById('deleteFormModal');
+    if (m) m.classList.remove('active');
 }
 
 async function confirmDeleteForm() {
-    console.log('[DEBUG] confirmDeleteForm called, formToDelete:', formToDelete);
     if (!formToDelete) return;
     const form = forms.find(f => f.id === formToDelete);
     if (form && form.supabaseId && sbClient) {
@@ -323,7 +324,8 @@ async function confirmDeleteForm() {
     }
     formToDelete = null;
     saveForms();
-    document.getElementById('deleteFormModal').classList.remove('active');
+    const m = document.getElementById('deleteFormModal');
+    if (m) m.classList.remove('active');
     renderFormList();
     if (currentFormId) selectForm(currentFormId);
 }
@@ -962,12 +964,27 @@ async function saveCurrentForm() {
 }
 
 async function downloadFormExcel(formId) {
-    console.log('[DEBUG] downloadFormExcel called, formId:', formId, 'typeof XLSX:', typeof XLSX);
     const form = forms.find(f => f.id === formId);
     if (!form) return;
+    showToast(' Menyiapkan file Excel...');
+
+    // Load SheetJS dynamically if not already loaded
     if (typeof XLSX === 'undefined') {
-        console.error('[DEBUG] SheetJS (XLSX) not loaded!');
-        showToast(' Gagal: SheetJS belum dimuat', true);
+        try {
+            await new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = 'xlsx.full.min.js';
+                s.onload = resolve;
+                s.onerror = () => reject(new Error('Failed to load SheetJS'));
+                document.head.appendChild(s);
+            });
+        } catch (e) {
+            showToast(' Gagal memuat pustaka Excel', true);
+            return;
+        }
+    }
+    if (typeof XLSX === 'undefined') {
+        showToast(' Gagal memuat pustaka Excel', true);
         return;
     }
     showToast(' Menyiapkan file Excel...');
