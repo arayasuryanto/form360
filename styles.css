@@ -217,6 +217,9 @@ body {
     width: 100%;
     box-shadow: 0 1px 3px rgba(0,0,0,0.04);
     animation: cardFadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 160px);
 }
 
 /* Start Screen */
@@ -253,6 +256,7 @@ body {
     gap: 8px;
     margin-bottom: 20px;
     animation: fadeSlideIn 0.4s ease 0.1s both;
+    flex-shrink: 0;
 }
 
 @keyframes fadeSlideIn {
@@ -283,6 +287,7 @@ body {
     color: var(--text-primary);
     margin-bottom: 8px;
     transition: opacity 0.2s ease, transform 0.2s ease;
+    flex-shrink: 0;
 }
 
 .question-text strong {
@@ -303,6 +308,7 @@ body {
     color: var(--text-muted);
     margin-bottom: 32px;
     animation: fadeSlideIn 0.4s ease 0.15s both;
+    flex-shrink: 0;
 }
 
 /* Options List */
@@ -311,7 +317,29 @@ body {
     flex-direction: column;
     gap: 12px;
     margin-bottom: 32px;
-    min-height: 200px;
+    min-height: 120px;
+    max-height: 320px;
+    overflow-y: auto;
+    padding-right: 8px;
+    flex-shrink: 1;
+    scroll-behavior: smooth;
+}
+
+.options-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.options-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.options-list::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+}
+
+.options-list::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
 }
 
 /* Text Input Container */
@@ -450,6 +478,7 @@ body {
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     opacity: 0;
     animation: btnFadeIn 0.4s ease 0.5s forwards;
+    flex-shrink: 0;
 }
 
 @keyframes btnFadeIn {
