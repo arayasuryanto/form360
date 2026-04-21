@@ -140,6 +140,18 @@
         </div>
     </div>
 
+    <!-- Delete Form Confirmation Modal -->
+    <div class="modal" id="deleteFormModal">
+        <div class="modal-content">
+            <h2 class="modal-title">Hapus Form?</h2>
+            <p class="modal-message" id="deleteFormMsg">Apakah kamu yakin ingin menghapus form ini? Data responden akan tetap tersimpan.</p>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelDeleteForm">Batal</button>
+                <button class="btn btn-danger" id="confirmDeleteForm">Hapus</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Respondents Modal -->
     <div class="modal" id="respondentsModal">
         <div class="modal-content respondents-modal-content">
@@ -197,6 +209,7 @@
         </div>
     </div>
 
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <script src="editor.js"></script>
 </body>
 </html>

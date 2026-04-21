@@ -8,6 +8,7 @@ let sbClient = null;
 let forms = [];
 let currentFormId = null;
 let questionToDelete = null;
+let formToDelete = null;
 const OPTION_KEYS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 
 // DOM Elements
@@ -215,6 +216,8 @@ function setupEventListeners() {
     bind('shareBtn', 'click', showShareModal);
     bind('copyLinkBtn', 'click', copyShareLink);
     bind('closeShareModal', 'click', hideShareModal);
+    bind('cancelDeleteForm', 'click', cancelDeleteForm);
+    bind('confirmDeleteForm', 'click', confirmDeleteForm);
 
     if (formNameInput) formNameInput.addEventListener('input', updateFormSetting);
     if (formDescriptionInput) formDescriptionInput.addEventListener('input', updateFormSetting);
@@ -269,6 +272,41 @@ function confirmDelete() {
         renderFormList();
     }
     hideDeleteModal();
+}
+
+function showDeleteFormModal(formId) {
+    const form = forms.find(f => f.id === formId);
+    if (!form) return;
+    formToDelete = formId;
+    document.getElementById('deleteFormMsg').textContent =
+        `Hapus "${form.name || 'Tanpa Nama'}"? Data responden akan tetap tersimpan.`;
+    document.getElementById('deleteFormModal').classList.add('active');
+}
+
+function cancelDeleteForm() {
+    formToDelete = null;
+    document.getElementById('deleteFormModal').classList.remove('active');
+}
+
+async function confirmDeleteForm() {
+    if (!formToDelete) return;
+    const form = forms.find(f => f.id === formToDelete);
+    if (form && form.supabaseId && sbClient) {
+        try {
+            await sbClient.from('forms').delete().eq('id', form.supabaseId);
+        } catch (e) {
+            console.error('Delete form from Supabase error:', e);
+        }
+    }
+    forms = forms.filter(f => f.id !== formToDelete);
+    if (currentFormId === formToDelete) {
+        currentFormId = forms.length > 0 ? forms[0].id : null;
+    }
+    formToDelete = null;
+    saveForms();
+    document.getElementById('deleteFormModal').classList.remove('active');
+    renderFormList();
+    if (currentFormId) selectForm(currentFormId);
 }
 
 function showPreview() {
@@ -652,10 +690,27 @@ function renderFormList() {
                     <div class="form-item-meta" id="meta-${form.id}">${questionCount} pertanyaan · ${localCount} responden</div>
                 </div>
                 <div class="form-item-actions">
+                    <button class="icon-btn export-btn" onclick="event.stopPropagation(); downloadFormExcel('${form.id}')" title="Export Excel">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="16" y1="13" x2="8" y2="13"/>
+                            <line x1="16" y1="17" x2="8" y2="17"/>
+                        </svg>
+                    </button>
                     <button class="icon-btn view-btn" onclick="event.stopPropagation(); showRespondentsModal('${form.id}')" title="Lihat Responden">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                             <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                    </button>
+                    <button class="icon-btn delete-btn" onclick="event.stopPropagation(); showDeleteFormModal('${form.id}')" title="Hapus Form">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                            <path d="M10 11v6"/>
+                            <path d="M14 11v6"/>
+                            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
                         </svg>
                     </button>
                 </div>
@@ -887,6 +942,125 @@ async function saveCurrentForm() {
     showToast(id ? 'Form tersimpan!' : 'Tersimpan lokal (Supabase gagal)');
 }
 
+async function downloadFormExcel(formId) {
+    const form = forms.find(f => f.id === formId);
+    if (!form) return;
+    showToast(' Menyiapkan file Excel...');
+
+    // Gather respondents
+    let respondents = [];
+    if (sbClient && form.supabaseId) {
+        respondents = await fetchRespondentsFromSupabase(form.supabaseId) || [];
+    }
+    if (respondents.length === 0) {
+        respondents = getRespondentsForForm(formId);
+    }
+
+    // Build answers map for each respondent
+    const answersByResp = {};
+    for (const r of respondents) {
+        if (sbClient && form.supabaseId) {
+            answersByResp[r.id] = await fetchAnswersFromSupabase(r.id);
+        } else {
+            const local = getRespondentData(formId, r.id);
+            answersByResp[r.id] = local ? Object.entries(local.answers || {}).map(([qId, val]) => ({ question_id: qId, answer_value: val })) : [];
+        }
+    }
+
+    // Supabase question id map
+    const qIdMap = form.supabaseQuestionIds || {};
+    const reverseMap = {};
+    Object.entries(qIdMap).forEach(([localId, sbQId]) => { reverseMap[sbQId] = localId; });
+
+    const qList = form.questions;
+    const fmt = v => (v === null || v === undefined || v === '') ? '-' : String(v);
+
+    // ── Sheet 1: Ringkasan ──────────────────────────────────────────
+    const ringkasanData = [
+        ['Form360 — Ringkasan'],
+        [],
+        ['Nama Form', form.name || 'Tanpa Nama'],
+        ['Jumlah Pertanyaan', qList.length],
+        ['Jumlah Responden', respondents.length],
+        ['Rata-rata Waktu', respondents.length > 0
+            ? Math.round(respondents.reduce((s, r) => s + (r.time_taken ?? r.timeTaken ?? 0), 0) / respondents.length) + ' detik'
+            : '-'],
+        ['Responden Pertama', respondents.length > 0
+            ? (respondents[respondents.length - 1].created_at
+                ? new Date(respondents[respondents.length - 1].created_at).toLocaleString('id-ID')
+                : '-')
+            : '-'],
+        ['Responden Terakhir', respondents.length > 0
+            ? (respondents[0].created_at
+                ? new Date(respondents[0].created_at).toLocaleString('id-ID')
+                : '-')
+            : '-'],
+    ];
+
+    // ── Sheet 2: Responden ──────────────────────────────────────────
+    const respHeader = ['#', 'Waktu Submit', 'Durasi (detik)', ...qList.map((q, i) => `Q${i + 1}: ${fmt(q.title)}`)];
+    const respRows = respondents.map((r, i) => {
+        const ts = r.created_at ? new Date(r.created_at).toLocaleString('id-ID') : '-';
+        const dur = r.time_taken ?? r.timeTaken ?? '-';
+        const ans = answersByResp[r.id] || [];
+        const ansMap = {};
+        ans.forEach(a => { ansMap[a.question_id] = a.answer_value; });
+
+        const qAnswers = qList.map(q => {
+            const sbQId = qIdMap[q.id];
+            const localId = q.id;
+            const val = ansMap[sbQId] ?? ansMap[String(localId)] ?? '-';
+            if (val === '-' || val === null) return '-';
+            // For multiple choice, show text label
+            if (q.type === 'multiple_choice' && q.options) {
+                const opt = q.options.find(o => o.value === val);
+                return opt ? opt.text : val;
+            }
+            return fmt(val);
+        });
+        return [i + 1, ts, dur, ...qAnswers];
+    });
+
+    // ── Sheet 3: Distribusi ────────────────────────────────────────
+    const distHeader = ['Pertanyaan', 'Opsi / Nilai', 'Jumlah', 'Persentase'];
+    const distRows = [];
+    qList.forEach((q, qi) => {
+        if (q.type === 'multiple_choice' && q.options) {
+            const ans = (answersByResp[respondents[0]?.id] || []).length > 0
+                ? respondents.flatMap(r => (answersByResp[r.id] || []).map(a => {
+                    const sbQId = qIdMap[q.id];
+                    return a.question_id === sbQId ? a.answer_value : null;
+                })).filter(Boolean)
+                : [];
+            q.options.forEach(opt => {
+                const count = ans.filter(v => v === opt.value).length;
+                const pct = ans.length > 0 ? ((count / ans.length) * 100).toFixed(1) + '%' : '0%';
+                distRows.push([`Q${qi + 1}: ${fmt(q.title)}`, opt.text, count, pct]);
+            });
+        } else {
+            distRows.push([`Q${qi + 1}: ${fmt(q.title)}`, '(Isian teks)', '-', '-']);
+        }
+    });
+
+    // ── Write workbook ───────────────────────────────────────────────
+    const wb = XLSX.utils.book_new();
+    const wsRingkasan = XLSX.utils.aoa_to_sheet(ringkasanData);
+    const wsResponden = XLSX.utils.aoa_to_sheet([respHeader, ...respRows]);
+    const wsDist = XLSX.utils.aoa_to_sheet([distHeader, ...distRows]);
+
+    // Column widths
+    wsResponden['!cols'] = [{ wch: 4 }, { wch: 22 }, { wch: 14 }, ...qList.map(() => ({ wch: 25 }))];
+    wsDist['!cols'] = [{ wch: 35 }, { wch: 25 }, { wch: 10 }, { wch: 12 }];
+
+    XLSX.utils.book_append_sheet(wb, wsRingkasan, 'Ringkasan');
+    XLSX.utils.book_append_sheet(wb, wsResponden, 'Responden');
+    XLSX.utils.book_append_sheet(wb, wsDist, 'Distribusi');
+
+    const filename = `Form360_${(form.name || 'form').replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    XLSX.writeFile(wb, filename);
+    showToast(' Excel diunduh!');
+}
+
 // Make functions available globally
 window.selectForm = selectForm;
 window.changeQuestionType = changeQuestionType;
@@ -899,3 +1073,5 @@ window.deleteQuestion = deleteQuestion;
 window.showRespondentsModal = showRespondentsModal;
 window.showRespondentDetail = showRespondentDetail;
 window.showRespondentsList = showRespondentsList;
+window.showDeleteFormModal = showDeleteFormModal;
+window.downloadFormExcel = downloadFormExcel;

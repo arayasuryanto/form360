@@ -624,6 +624,18 @@
     border-color: var(--text-primary);
 }
 
+.icon-btn.export-btn:hover {
+    background: #2e7d32;
+    border-color: #2e7d32;
+    color: #fff;
+}
+
+.icon-btn.delete-btn:hover {
+    background: #c62828;
+    border-color: #c62828;
+    color: #fff;
+}
+
 /* Respondents Modal */
 .respondents-modal-content {
     max-width: 700px;
