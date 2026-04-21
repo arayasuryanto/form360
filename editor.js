@@ -426,6 +426,12 @@ async function showRespondentDetail(formId, respondentId) {
             saveForms();
         }
 
+        console.log('[DEBUG] rawAnswers from Supabase:', rawAnswers);
+        console.log('[DEBUG] qIdMap (local id → UUID):', qIdMap);
+        console.log('[DEBUG] form.supabaseId:', form.supabaseId);
+        console.log('[DEBUG] respondentId:', respondentId);
+        console.log('[DEBUG] answersMap:', answersMap);
+
         answersContainer.innerHTML = form.questions.map((q, i) => {
             const supabaseQId = qIdMap[q.id];
             const answerText = (supabaseQId && answersMap[supabaseQId]) || '-';

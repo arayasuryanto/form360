@@ -189,6 +189,8 @@ async function saveResponseToSupabase(timeTaken, answersArray) {
     if (!sbClient) return false;
 
     try {
+        console.log('[DEBUG VIEWER] saving answersArray:', answersArray);
+        console.log('[DEBUG VIEWER] currentFormId:', currentFormId);
         // Insert response
         const { data: response, error: respError } = await sbClient
             .from('responses')
@@ -197,6 +199,7 @@ async function saveResponseToSupabase(timeTaken, answersArray) {
             .single();
 
         if (respError) throw respError;
+        console.log('[DEBUG VIEWER] response saved, id:', response.id);
 
         // Insert answers
         const answersToInsert = answersArray.map(a => ({
@@ -204,6 +207,7 @@ async function saveResponseToSupabase(timeTaken, answersArray) {
             question_id: a.questionId,
             answer_value: a.answer
         }));
+        console.log('[DEBUG VIEWER] answersToInsert:', answersToInsert);
 
         await sbClient.from('answers').insert(answersToInsert);
         return true;
