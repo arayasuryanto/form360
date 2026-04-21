@@ -881,7 +881,7 @@ function renderQuestions() {
         }
 
         return `
-            <div class="question-item ${q.type === 'section' ? 'section-item' : ''}" data-id="${q.id}" style="${q.color ? 'border-left: 4px solid ' + q.color : ''}">
+            <div class="question-item ${q.type === 'section' ? 'section-item' : ''}" data-id="${q.id}" style="${q.color ? 'background:' + q.color + '15;border-color:' + q.color + '40;' : ''}">
                 <div class="question-header">
                     <div class="question-number">
                         ${badge}

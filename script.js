@@ -514,7 +514,7 @@ function loadQuestion(idx) {
     setTimeout(() => {
         if (q.type === 'section') {
             // Section: show centered card with title, subtitle, button
-            const colorStyle = q.color ? `border-left: 4px solid ${q.color};` : '';
+            const colorStyle = q.color ? `background:${q.color}18;border-top:3px solid ${q.color};` : '';
             const btnColorStyle = q.color ? `background:${q.color};` : '';
             optionsList.innerHTML = `
                 <div class="section-screen" style="${colorStyle}">
@@ -626,7 +626,13 @@ function loadQuestion(idx) {
         // Apply color accent to question card
         const questionCard = questionScreen.querySelector('.question-card');
         if (questionCard) {
-            questionCard.style.borderLeft = q.color ? `4px solid ${q.color}` : '';
+            if (q.color) {
+                questionCard.style.background = q.color + '18';
+                questionCard.style.borderTop = `3px solid ${q.color}`;
+            } else {
+                questionCard.style.background = '';
+                questionCard.style.borderTop = '';
+            }
         }
 
         optionsList.style.opacity = '1';
