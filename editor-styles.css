@@ -177,6 +177,15 @@
     resize: vertical;
     height: auto;
     min-height: 60px;
+    overflow: auto;
+}
+
+#formDescription,
+#welcomeSubtitle {
+    resize: vertical !important;
+    min-height: 70px !important;
+    overflow: auto !important;
+    height: unset !important;
 }
 
 /* Questions List */
