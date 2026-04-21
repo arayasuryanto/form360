@@ -192,7 +192,7 @@ function showPreview() {
     if (form) {
         // Save to localStorage for preview
         localStorage.setItem('form360_preview', JSON.stringify(form));
-        previewFrame.src = 'index.html?preview=true';
+        previewFrame.src = 'viewer.html?preview=true';
         previewModal.classList.add('active');
     }
 }
@@ -211,7 +211,7 @@ async function showShareModal() {
     shareBtn.innerHTML = 'Menyimpan...';
     shareBtn.disabled = true;
 
-    const baseUrl = window.location.origin + window.location.pathname.replace('editor.html', 'index.html');
+    const baseUrl = window.location.origin + '/viewer.html';
     let shareLink;
 
     // Save to Supabase for a clean UUID-based link

@@ -12,11 +12,6 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
 
 [[redirects]]
-  from = "/"
-  to = "/editor.html"
-  status = 302
-
-[[redirects]]
   from = "/*"
-  to = "/index.html"
+  to = "/viewer.html"
   status = 200

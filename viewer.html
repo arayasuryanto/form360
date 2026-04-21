@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Form360</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+</head>
+<body>
+    <!-- Top Navigation Bar -->
+    <nav class="top-nav">
+        <div class="logo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="3" width="18" height="18" rx="4" stroke="currentColor" stroke-width="2"/>
+                <path d="M8 12h8M12 8v8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <span>Form360</span>
+        </div>
+        <div class="dynamic-stepper" id="dynamicStepper"></div>
+        <div class="nav-spacer"></div>
+    </nav>
+
+    <!-- Start Screen -->
+    <main class="main-container">
+        <div class="form-container" id="startScreen">
+            <div class="question-card start-screen">
+                <h2 class="start-title" id="welcomeTitle">Halo, Selamat Datang!</h2>
+                <p class="start-subtitle" id="welcomeSubtitle">Tekan Mulai atau Enter untuk memulai</p>
+                <button class="continue-btn" id="startBtn">Mulai</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Question Screen -->
+    <main class="main-container" id="questionScreen" style="display: none;">
+        <div class="form-container">
+            <div class="question-card">
+                <div class="question-indicator">
+                    <span class="q-number">1</span>
+                    <span class="q-arrow">→</span>
+                </div>
+                <h2 class="question-text"></h2>
+                <p class="question-hint">Pilih salah satu</p>
+
+                <div class="options-list"></div>
+
+                <button class="continue-btn" id="continueBtn" disabled>Continue</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Results Screen -->
+    <main class="main-container" id="resultsScreen" style="display: none;">
+        <div class="form-container">
+            <div class="results-summary">
+                <h1 id="resultsTitle">Terima Kasih!</h1>
+                <p id="resultsSubtitle">Kamu telah menyelesaikan form ini</p>
+                <button class="continue-btn" id="restartBtn">Ikuti Lagi</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <div class="bottom-nav" id="bottomNav" style="display: none;">
+        <div class="scroll-indicator">
+            <span id="progressText">1/5</span>
+            <div class="scroll-arrows">
+                <button class="scroll-btn" id="scrollUp" disabled>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M12 10L8 6l-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+                <button class="scroll-btn" id="scrollDown">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
