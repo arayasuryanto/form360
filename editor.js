@@ -139,8 +139,12 @@ async function fetchQuestionsForForm(supabaseFormId) {
                 title: q.title || '',
                 placeholder: q.placeholder || ''
             };
-            if (q.question_type === 'multiple_choice' && q.options) {
+            if ((q.question_type === 'multiple_choice' || q.question_type === 'checkbox') && q.options) {
                 base.options = typeof q.options === 'string' ? JSON.parse(q.options) : q.options;
+            }
+            if (q.question_type === 'section') {
+                base.subtitle = q.placeholder || '';
+                base.buttonText = 'Lanjut';
             }
             return base;
         });
@@ -179,19 +183,22 @@ function createQuestionData(id, type = 'multiple_choice') {
     const base = {
         id: id,
         type: type,
-        title: ''
+        title: '',
+        color: null
     };
 
-    if (type === 'multiple_choice') {
+    if (type === 'multiple_choice' || type === 'checkbox') {
         base.options = [
             { text: 'Opsi A', value: 'opt_a' },
             { text: 'Opsi B', value: 'opt_b' },
             { text: 'Opsi C', value: 'opt_c' },
             { text: 'Opsi D', value: 'opt_d' }
         ];
+    } else if (type === 'section') {
+        base.subtitle = '';
+        base.buttonText = 'Lanjut';
     } else {
         base.placeholder = 'ketik jawaban kamu di sini...';
-        // hint is now hardcoded in viewer, not editable
     }
 
     return base;
@@ -218,6 +225,9 @@ function setupEventListeners() {
     bind('closeShareModal', 'click', hideShareModal);
     bind('cancelDeleteForm', 'click', cancelDeleteForm);
     bind('confirmDeleteForm', 'click', confirmDeleteForm);
+    bind('cancelAddQuestion', 'click', cancelAddQuestion);
+    bind('addQuestionQuestion', 'click', () => confirmAddQuestion('multiple_choice'));
+    bind('addQuestionSection', 'click', () => confirmAddQuestion('section'));
 
     if (formNameInput) formNameInput.addEventListener('input', updateFormSetting);
     if (formDescriptionInput) formDescriptionInput.addEventListener('input', updateFormSetting);
@@ -507,11 +517,22 @@ async function showRespondentDetail(formId, respondentId) {
 
         answersContainer.innerHTML = form.questions.map((q, i) => {
             const supabaseQId = qIdMap[q.id];
-            const answerText = (supabaseQId && answersMap[supabaseQId]) || '-';
+            let answerText = (supabaseQId && answersMap[supabaseQId]) || '-';
+            // For checkbox, convert values to labels
+            if (q.type === 'checkbox' && q.options && answerText !== '-') {
+                answerText = answerText.split(',').map(v => {
+                    const opt = q.options.find(o => o.value === v);
+                    return opt ? opt.text : v;
+                }).join(', ');
+            } else if ((q.type === 'multiple_choice') && q.options && answerText !== '-') {
+                const opt = q.options.find(o => o.value === answerText);
+                if (opt) answerText = opt.text;
+            }
+            const label = q.type === 'section' ? 'Section' : `${i + 1}. ${q.title || 'Pertanyaan tanpa judul'}`;
             return `
                 <div class="answer-item">
-                    <div class="answer-question">${i + 1}. ${q.title || 'Pertanyaan tanpa judul'}</div>
-                    <div class="answer-value">${answerText}</div>
+                    <div class="answer-question">${label}</div>
+                    <div class="answer-value">${q.type === 'section' ? '-' : answerText}</div>
                 </div>
             `;
         }).join('');
@@ -699,14 +720,33 @@ function updateFormSetting() {
 }
 
 function addQuestion() {
+    const modal = document.getElementById('addQuestionModal');
+    if (modal) modal.classList.add('active');
+}
+
+function confirmAddQuestion(type) {
     const form = getCurrentForm();
     if (!form) return;
 
     const newId = form.questions.length + 1;
-    const newQuestion = createQuestionData(newId, 'multiple_choice');
+    const newQuestion = createQuestionData(newId, type);
     form.questions.push(newQuestion);
     saveForms();
     renderQuestions();
+
+    const modal = document.getElementById('addQuestionModal');
+    if (modal) modal.classList.remove('active');
+
+    // Scroll to the new question
+    setTimeout(() => {
+        const items = questionsList.querySelectorAll('.question-item');
+        if (items.length > 0) items[items.length - 1].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+}
+
+function cancelAddQuestion() {
+    const modal = document.getElementById('addQuestionModal');
+    if (modal) modal.classList.remove('active');
 }
 
 function deleteQuestion(questionId) {
@@ -787,40 +827,78 @@ function renderQuestions() {
         return;
     }
 
-    questionsList.innerHTML = form.questions.map((q, index) => `
-        <div class="question-item" data-id="${q.id}">
-            <div class="question-header">
-                <div class="question-number">
-                    <span class="question-badge">${q.id}</span>
-                    <select class="question-type-select" onchange="changeQuestionType(${q.id}, this.value)">
-                        <option value="multiple_choice" ${q.type === 'multiple_choice' ? 'selected' : ''}>Pilihan Ganda</option>
-                        <option value="text_input" ${q.type === 'text_input' ? 'selected' : ''}>Isian Teks</option>
-                    </select>
-                </div>
-                <div class="question-actions">
-                    <button class="delete" onclick="deleteQuestion(${q.id})" title="Hapus">🗑</button>
-                </div>
-            </div>
-            <div class="question-fields">
+    const COLORS = ['#e53935','#f57c00','#fbc02d','#43a047','#1e88e5','#5e35b1','#d81b60','#00897b','#6d4c41','#546e7a'];
+
+    questionsList.innerHTML = form.questions.map((q, index) => {
+        const typeSelect = q.type === 'section' ? '' : `
+            <select class="question-type-select" onchange="changeQuestionType(${q.id}, this.value)">
+                <option value="multiple_choice" ${q.type === 'multiple_choice' ? 'selected' : ''}>Pilihan Ganda</option>
+                <option value="checkbox" ${q.type === 'checkbox' ? 'selected' : ''}>Kotak Centang</option>
+                <option value="text_input" ${q.type === 'text_input' ? 'selected' : ''}>Isian Teks</option>
+            </select>`;
+
+        const badge = q.type === 'section'
+            ? `<span class="question-badge section-badge">S</span>`
+            : `<span class="question-badge">${q.id}</span>`;
+
+        const colorDot = q.color
+            ? `<span class="color-dot" style="background:${q.color}" onclick="event.stopPropagation(); toggleColorPicker(${q.id})"></span>`
+            : `<span class="color-dot color-dot-empty" onclick="event.stopPropagation(); toggleColorPicker(${q.id})"></span>`;
+
+        const colorPicker = `<div class="color-picker-popover" id="colorPicker-${q.id}" style="display:none">
+            ${COLORS.map(c => `<span class="color-swatch ${q.color === c ? 'active' : ''}" style="background:${c}" onclick="event.stopPropagation(); setQuestionColor(${q.id}, '${c}')"></span>`).join('')}
+            <span class="color-swatch color-swatch-remove" onclick="event.stopPropagation(); setQuestionColor(${q.id}, null)">✕</span>
+        </div>`;
+
+        let fields = '';
+        if (q.type === 'section') {
+            fields = `
+                <input type="text" value="${q.title || ''}" placeholder="Judul Section..." onchange="updateQuestionTitle(${q.id}, this.value)">
+                <textarea placeholder="Subtitle (opsional)..." onchange="updateSectionSubtitle(${q.id}, this.value)" rows="2">${q.subtitle || ''}</textarea>
+                <input type="text" value="${q.buttonText || 'Lanjut'}" placeholder="Teks tombol..." onchange="updateSectionButtonText(${q.id}, this.value)">
+            `;
+        } else if (q.type === 'text_input') {
+            fields = `
                 <input type="text" value="${q.title}" placeholder="Pertanyaan..." onchange="updateQuestionTitle(${q.id}, this.value)">
-                ${q.type === 'text_input' ? `
-                    <input type="text" value="${q.placeholder || ''}" placeholder="Placeholder (opsional)..." onchange="updateQuestionPlaceholder(${q.id}, this.value)">
-                ` : `
-                    <div class="options-editor">
-                        <div class="options-label">Opsi:</div>
-                        ${q.options.map((opt, i) => `
-                            <div class="option-item">
-                                <span class="option-key">${OPTION_KEYS[i]}</span>
-                                <input type="text" value="${opt.text}" placeholder="Opsi..." onchange="updateOptionText(${q.id}, ${i}, this.value)">
-                                <button class="option-delete-btn" onclick="deleteOption(${q.id}, ${i})">&times;</button>
-                            </div>
-                        `).join('')}
-                        ${q.options.length < 8 ? `<button class="add-option-btn" onclick="addOption(${q.id})">+ Tambah Opsi</button>` : ''}
+                <input type="text" value="${q.placeholder || ''}" placeholder="Placeholder (opsional)..." onchange="updateQuestionPlaceholder(${q.id}, this.value)">
+            `;
+        } else {
+            // multiple_choice or checkbox — same options editor
+            fields = `
+                <input type="text" value="${q.title}" placeholder="Pertanyaan..." onchange="updateQuestionTitle(${q.id}, this.value)">
+                <div class="options-editor">
+                    <div class="options-label">${q.type === 'checkbox' ? 'Opsi (boleh pilih lebih dari satu):' : 'Opsi:'}</div>
+                    ${q.options.map((opt, i) => `
+                        <div class="option-item">
+                            <span class="option-key">${OPTION_KEYS[i]}</span>
+                            <input type="text" value="${opt.text}" placeholder="Opsi..." onchange="updateOptionText(${q.id}, ${i}, this.value)">
+                            <button class="option-delete-btn" onclick="deleteOption(${q.id}, ${i})">&times;</button>
+                        </div>
+                    `).join('')}
+                    ${q.options.length < 8 ? `<button class="add-option-btn" onclick="addOption(${q.id})">+ Tambah Opsi</button>` : ''}
+                </div>
+            `;
+        }
+
+        return `
+            <div class="question-item ${q.type === 'section' ? 'section-item' : ''}" data-id="${q.id}" style="${q.color ? 'border-left: 4px solid ' + q.color : ''}">
+                <div class="question-header">
+                    <div class="question-number">
+                        ${badge}
+                        ${typeSelect}
                     </div>
-                `}
+                    <div class="question-actions" style="position:relative">
+                        ${colorDot}
+                        ${colorPicker}
+                        <button class="delete" onclick="deleteQuestion(${q.id})" title="Hapus">🗑</button>
+                    </div>
+                </div>
+                <div class="question-fields">
+                    ${fields}
+                </div>
             </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 // Question manipulation functions
@@ -832,11 +910,11 @@ function changeQuestionType(questionId, newType) {
     const oldType = q.type;
     q.type = newType;
 
-    if (newType === 'text_input' && oldType === 'multiple_choice') {
-        q.placeholder = q.placeholder || '';
-        // hint is now hardcoded
-        delete q.options;
-    } else if (newType === 'multiple_choice' && oldType === 'text_input') {
+    const hasOptions = (newType === 'multiple_choice' || newType === 'checkbox');
+    const hadOptions = (oldType === 'multiple_choice' || oldType === 'checkbox');
+
+    if (hasOptions && !hadOptions) {
+        // Coming from text_input or section — add default options
         q.options = [
             { text: 'Opsi A', value: 'opt_a' },
             { text: 'Opsi B', value: 'opt_b' },
@@ -844,7 +922,14 @@ function changeQuestionType(questionId, newType) {
             { text: 'Opsi D', value: 'opt_d' }
         ];
         delete q.placeholder;
-        delete q.hint;
+        delete q.subtitle;
+        delete q.buttonText;
+    } else if (!hasOptions && hadOptions) {
+        // Going to text_input — remove options
+        if (newType === 'text_input') {
+            q.placeholder = q.placeholder || '';
+        }
+        delete q.options;
     }
 
     saveForms();
@@ -868,6 +953,52 @@ function updateQuestionPlaceholder(questionId, placeholder) {
         saveForms();
     }
 }
+
+function updateSectionSubtitle(questionId, subtitle) {
+    const form = getCurrentForm();
+    const q = form.questions.find(q => q.id === questionId);
+    if (q) {
+        q.subtitle = subtitle;
+        saveForms();
+    }
+}
+
+function updateSectionButtonText(questionId, text) {
+    const form = getCurrentForm();
+    const q = form.questions.find(q => q.id === questionId);
+    if (q) {
+        q.buttonText = text;
+        saveForms();
+    }
+}
+
+function toggleColorPicker(questionId) {
+    // Close all other pickers first
+    document.querySelectorAll('.color-picker-popover').forEach(p => {
+        if (p.id !== 'colorPicker-' + questionId) p.style.display = 'none';
+    });
+    const picker = document.getElementById('colorPicker-' + questionId);
+    if (picker) {
+        picker.style.display = picker.style.display === 'none' ? 'flex' : 'none';
+    }
+}
+
+function setQuestionColor(questionId, color) {
+    const form = getCurrentForm();
+    const q = form.questions.find(q => q.id === questionId);
+    if (q) {
+        q.color = color;
+        saveForms();
+        renderQuestions();
+    }
+}
+
+// Close color picker when clicking outside
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.color-dot') && !e.target.closest('.color-picker-popover')) {
+        document.querySelectorAll('.color-picker-popover').forEach(p => p.style.display = 'none');
+    }
+});
 
 function updateOptionText(questionId, optionIndex, text) {
     const form = getCurrentForm();
@@ -932,8 +1063,9 @@ async function saveFormToSupabase(form) {
             question_order: i + 1,
             question_type: q.type,
             title: q.title,
-            placeholder: q.placeholder || null,
-            options: q.options ? JSON.stringify(q.options) : null
+            placeholder: q.type === 'section' ? (q.subtitle || '') : (q.placeholder || null),
+            options: q.options ? JSON.stringify(q.options) : null,
+            color: q.color || null
         }));
         if (questionsToInsert.length > 0) {
             const { data: qData, error: qErr } = await sbClient.from('questions').insert(questionsToInsert).select();
@@ -1065,12 +1197,21 @@ async function downloadFormExcel(formId) {
         ans.forEach(a => { ansMap[a.question_id] = a.answer_value; });
 
         const qAnswers = qList.map(q => {
+            if (q.type === 'section') return '-';
             const sbQId = qIdMap[q.id];
             const localId = q.id;
             const val = ansMap[sbQId] ?? ansMap[String(localId)] ?? '-';
             if (val === '-' || val === null) return '-';
-            // For multiple choice, show text label
-            if (q.type === 'multiple_choice' && q.options) {
+            // For multiple choice or checkbox, show text label(s)
+            if ((q.type === 'multiple_choice' || q.type === 'checkbox') && q.options) {
+                if (q.type === 'checkbox') {
+                    // Multiple values separated by comma
+                    const vals = val.split(',');
+                    return vals.map(v => {
+                        const opt = q.options.find(o => o.value === v);
+                        return opt ? opt.text : v;
+                    }).join(', ');
+                }
                 const opt = q.options.find(o => o.value === val);
                 return opt ? opt.text : val;
             }
@@ -1083,7 +1224,9 @@ async function downloadFormExcel(formId) {
     const distHeader = ['Pertanyaan', 'Opsi / Nilai', 'Jumlah', 'Persentase'];
     const distRows = [];
     qList.forEach((q, qi) => {
-        if (q.type === 'multiple_choice' && q.options) {
+        if (q.type === 'section') {
+            distRows.push([`Section ${qi + 1}: ${fmt(q.title)}`, '(Section)', '-', '-']);
+        } else if ((q.type === 'multiple_choice' || q.type === 'checkbox') && q.options) {
             const ans = (answersByResp[respondents[0]?.id] || []).length > 0
                 ? respondents.flatMap(r => (answersByResp[r.id] || []).map(a => {
                     const sbQId = qIdMap[q.id];
@@ -1124,6 +1267,8 @@ window.selectForm = selectForm;
 window.changeQuestionType = changeQuestionType;
 window.updateQuestionTitle = updateQuestionTitle;
 window.updateQuestionPlaceholder = updateQuestionPlaceholder;
+window.updateSectionSubtitle = updateSectionSubtitle;
+window.updateSectionButtonText = updateSectionButtonText;
 window.updateOptionText = updateOptionText;
 window.addOption = addOption;
 window.deleteOption = deleteOption;
@@ -1135,3 +1280,8 @@ window.showDeleteFormModal = showDeleteFormModal;
 window.cancelDeleteForm = cancelDeleteForm;
 window.confirmDeleteForm = confirmDeleteForm;
 window.downloadFormExcel = downloadFormExcel;
+window.toggleColorPicker = toggleColorPicker;
+window.setQuestionColor = setQuestionColor;
+window.addQuestion = addQuestion;
+window.confirmAddQuestion = confirmAddQuestion;
+window.cancelAddQuestion = cancelAddQuestion;

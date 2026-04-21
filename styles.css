@@ -737,3 +737,72 @@ body {
         padding: 70px 16px 60px;
     }
 }
+
+/* Checkbox option buttons */
+.option-btn.checkbox-btn .option-key {
+    width: 20px;
+    height: 20px;
+    padding: 3px;
+    background: var(--white);
+    border: 1.5px solid var(--border);
+    border-radius: 4px;
+}
+
+.option-btn.checkbox-btn.selected .option-key {
+    background: var(--text-primary);
+    border-color: var(--text-primary);
+}
+
+.option-btn.checkbox-btn.selected .checkbox-icon {
+    display: none !important;
+}
+
+.option-btn.checkbox-btn.selected .checkbox-checked-icon {
+    display: block !important;
+}
+
+/* Section Screen */
+.section-screen {
+    text-align: center;
+    padding: 32px 16px;
+    background: var(--white);
+    border-radius: 16px;
+    border: 1.5px solid var(--border);
+}
+
+.section-screen .section-subtitle {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    margin-bottom: 24px;
+    line-height: 1.5;
+}
+
+.section-continue-btn {
+    opacity: 1 !important;
+    animation: none !important;
+    display: inline-block;
+    width: auto;
+    padding: 14px 40px;
+}
+
+/* Section stepper */
+.step-item.section-step .step-circle {
+    background: #1e88e5;
+    color: #fff;
+}
+
+.step-item.section-step.active .step-circle {
+    background: #fff;
+    color: #1e88e5;
+}
+
+.step-item.section-step .step-label {
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #1e88e5;
+}
+
+.step-item.section-step.active .step-label {
+    color: #fff;
+}

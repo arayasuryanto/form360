@@ -19,6 +19,7 @@ let currentQuestionIndex = 0;
 let userName = "";
 let answers = {};
 let selectedAnswer = null;
+let selectedAnswers = [];
 let textValue = "";
 let isTransitioning = false;
 let startTime = null;
@@ -175,7 +176,10 @@ async function getFormFromSupabase(formId) {
             type: q.question_type,
             title: q.title,
             placeholder: q.placeholder,
-            options: q.options ? JSON.parse(q.options) : null
+            subtitle: q.question_type === 'section' ? (q.placeholder || '') : undefined,
+            buttonText: q.question_type === 'section' ? 'Lanjut' : undefined,
+            options: q.options ? JSON.parse(q.options) : null,
+            color: q.color || null
         }));
 
         return data;
@@ -233,6 +237,13 @@ function updateStepper() {
     const currentQ = currentQuestionIndex + 1;
     let html = '';
 
+    // Build step items showing section labels
+    const getStepLabel = (idx) => {
+        const q = questions[idx];
+        if (q.type === 'section') return q.title || 'Section';
+        return '';
+    };
+
     if (currentQ === 1) {
         html += `
             <div class="step-item mulai-step active">
@@ -263,11 +274,13 @@ function updateStepper() {
 
             const circleNum = isCurrent ? q : (isAnswered && !isCurrent ? '✓' : q);
             const activeClass = isCurrent ? 'active' : (isPast ? 'completed hoverable' : 'hoverable');
+            const isSection = questions[q - 1] && questions[q - 1].type === 'section';
+            const stepLabel = isSection ? (questions[q - 1].title || 'Section') : '';
 
             html += `
-                <div class="step-item question-step ${activeClass}" data-type="question" data-num="${q}">
-                    <div class="step-circle">${circleNum}</div>
-                    <span class="step-label"></span>
+                <div class="step-item question-step ${activeClass} ${isSection ? 'section-step' : ''}" data-type="question" data-num="${q}">
+                    <div class="step-circle">${isSection ? '§' : circleNum}</div>
+                    <span class="step-label">${stepLabel}</span>
                 </div>
             `;
         }
@@ -292,7 +305,10 @@ function updateStepper() {
 function saveCurrentAnswer() {
     const q = questions[currentQuestionIndex];
     if (!q) return;
-    if (q.type === 'multiple_choice' && selectedAnswer) {
+    if (q.type === 'section') return; // sections don't collect answers
+    if (q.type === 'checkbox' && selectedAnswers.length > 0) {
+        answers[q.id] = selectedAnswers.join(',');
+    } else if (q.type === 'multiple_choice' && selectedAnswer) {
         answers[q.id] = selectedAnswer;
     } else if (q.type === 'text_input' && textValue.trim()) {
         answers[q.id] = textValue;
@@ -321,11 +337,31 @@ function handleKeydown(e) {
     const q = questions[currentQuestionIndex];
     if (!q) return;
 
+    if (q.type === 'section') {
+        if (e.key === 'Enter') handleContinue();
+        return;
+    }
+
     if (q.type === 'text_input') {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             if (textValue.trim()) handleContinue();
         }
+        return;
+    }
+
+    if (q.type === 'checkbox') {
+        if (e.key === 'a' || e.key === 'A') toggleOptionByIndex(0);
+        else if (e.key === 'b' || e.key === 'B') toggleOptionByIndex(1);
+        else if (e.key === 'c' || e.key === 'C') toggleOptionByIndex(2);
+        else if (e.key === 'd' || e.key === 'D') toggleOptionByIndex(3);
+        else if (e.key === 'e' || e.key === 'E') toggleOptionByIndex(4);
+        else if (e.key === 'f' || e.key === 'F') toggleOptionByIndex(5);
+        else if (e.key === 'g' || e.key === 'G') toggleOptionByIndex(6);
+        else if (e.key === 'h' || e.key === 'H') toggleOptionByIndex(7);
+        else if (e.key === 'Enter' && !continueBtn.disabled) handleContinue();
+        else if (e.key === 'ArrowUp') { e.preventDefault(); navigate(-1); }
+        else if (e.key === 'ArrowDown') { e.preventDefault(); navigate(1); }
         return;
     }
 
@@ -343,11 +379,30 @@ function handleOptionClick(e) {
     const btn = e.target.closest('.option-btn');
     if (!btn) return;
 
-    optionsList.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
-    btn.classList.add('selected');
-    selectedAnswer = btn.dataset.value;
-    continueBtn.disabled = false;
-    continueBtn.style.opacity = '1';
+    const q = questions[currentQuestionIndex];
+    if (!q) return;
+
+    if (q.type === 'checkbox') {
+        // Toggle selection
+        const val = btn.dataset.value;
+        if (btn.classList.contains('selected')) {
+            btn.classList.remove('selected');
+            selectedAnswers = selectedAnswers.filter(v => v !== val);
+        } else {
+            btn.classList.add('selected');
+            selectedAnswers.push(val);
+        }
+        const hasSelection = selectedAnswers.length > 0;
+        continueBtn.disabled = !hasSelection;
+        continueBtn.style.opacity = hasSelection ? '1' : '0.5';
+    } else {
+        // Single select (multiple_choice)
+        optionsList.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selectedAnswer = btn.dataset.value;
+        continueBtn.disabled = false;
+        continueBtn.style.opacity = '1';
+    }
 }
 
 function selectOptionByIndex(idx) {
@@ -361,18 +416,48 @@ function selectOptionByIndex(idx) {
     }
 }
 
+function toggleOptionByIndex(idx) {
+    const btns = optionsList.querySelectorAll('.option-btn');
+    if (btns[idx]) {
+        const val = btns[idx].dataset.value;
+        if (btns[idx].classList.contains('selected')) {
+            btns[idx].classList.remove('selected');
+            selectedAnswers = selectedAnswers.filter(v => v !== val);
+        } else {
+            btns[idx].classList.add('selected');
+            selectedAnswers.push(val);
+        }
+        const hasSelection = selectedAnswers.length > 0;
+        continueBtn.disabled = !hasSelection;
+        continueBtn.style.opacity = hasSelection ? '1' : '0.5';
+    }
+}
+
 function handleContinue() {
     if (isTransitioning) return;
     const q = questions[currentQuestionIndex];
     if (!q) return;
 
-    if (q.type === 'multiple_choice' && !selectedAnswer) return;
-    if (q.type === 'text_input' && !textValue.trim()) return;
+    // Sections just advance
+    if (q.type === 'section') {
+        if (currentQuestionIndex >= questions.length - 1) {
+            showResults();
+            return;
+        }
+        currentQuestionIndex++;
+        loadQuestion(currentQuestionIndex);
+        return;
+    }
 
-    if (q.type === 'text_input') {
-        answers[q.id] = textValue;
-    } else {
+    if (q.type === 'checkbox') {
+        if (selectedAnswers.length === 0) return;
+        answers[q.id] = selectedAnswers.join(',');
+    } else if (q.type === 'multiple_choice') {
+        if (!selectedAnswer) return;
         answers[q.id] = selectedAnswer;
+    } else if (q.type === 'text_input') {
+        if (!textValue.trim()) return;
+        answers[q.id] = textValue;
     }
 
     if (currentQuestionIndex >= questions.length - 1) {
@@ -412,8 +497,13 @@ function loadQuestion(idx) {
     questionHintEl.classList.add('changing');
 
     setTimeout(() => {
-        questionTextEl.innerHTML = q.title;
-        questionHintEl.textContent = q.type === 'text_input' ? 'shift ↵ enter untuk baris baru' : 'Pilih salah satu';
+        if (q.type === 'section') {
+            questionTextEl.innerHTML = q.title || '';
+            questionHintEl.textContent = '';
+        } else {
+            questionTextEl.innerHTML = q.title;
+            questionHintEl.textContent = q.type === 'text_input' ? 'shift ↵ enter untuk baris baru' : (q.type === 'checkbox' ? 'Pilih satu atau lebih' : 'Pilih salah satu');
+        }
         questionTextEl.classList.remove('changing');
         questionHintEl.classList.remove('changing');
     }, 150);
@@ -422,7 +512,25 @@ function loadQuestion(idx) {
     optionsList.style.transform = 'translateY(-10px)';
 
     setTimeout(() => {
-        if (q.type === 'text_input') {
+        if (q.type === 'section') {
+            // Section: show centered card with title, subtitle, button
+            const colorStyle = q.color ? `border-left: 4px solid ${q.color};` : '';
+            const btnColorStyle = q.color ? `background:${q.color};` : '';
+            optionsList.innerHTML = `
+                <div class="section-screen" style="${colorStyle}">
+                    <p class="section-subtitle">${q.subtitle || ''}</p>
+                    <button class="continue-btn section-continue-btn" style="${btnColorStyle}" id="sectionContinueBtn">${q.buttonText || 'Lanjut'}</button>
+                </div>
+            `;
+            const sectionBtn = document.getElementById('sectionContinueBtn');
+            if (sectionBtn) {
+                sectionBtn.style.opacity = '1';
+                sectionBtn.disabled = false;
+                sectionBtn.addEventListener('click', handleContinue);
+            }
+            continueBtn.style.display = 'none';
+        } else if (q.type === 'text_input') {
+            continueBtn.style.display = '';
             const placeholder = q.placeholder || 'ketik jawaban kamu di sini...';
             optionsList.innerHTML = `
                 <div class="text-input-container">
@@ -452,7 +560,48 @@ function loadQuestion(idx) {
                 continueBtn.style.opacity = '1';
             }
             setTimeout(() => ta.focus(), 100);
+        } else if (q.type === 'checkbox') {
+            continueBtn.style.display = '';
+            const labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+            selectedAnswers = [];
+            optionsList.innerHTML = q.options.map((opt, i) => `
+                <button class="option-btn checkbox-btn" data-key="${labels[i]}" data-value="${opt.value}">
+                    <span class="option-key">
+                        <svg class="checkbox-icon" width="14" height="14" viewBox="0 0 14 14" fill="none">
+                            <rect x="1" y="1" width="12" height="12" rx="3" stroke="currentColor" stroke-width="1.5"/>
+                        </svg>
+                        <svg class="checkbox-checked-icon" width="14" height="14" viewBox="0 0 14 14" fill="none" style="display:none">
+                            <rect x="1" y="1" width="12" height="12" rx="3" fill="currentColor" stroke="currentColor" stroke-width="1.5"/>
+                            <path d="M4 7l2 2 4-4" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </span>
+                    <span class="option-text">${opt.text}</span>
+                </button>
+            `).join('');
+
+            // Restore previous selections
+            if (answers[q.id]) {
+                const prevAnswers = answers[q.id].split(',');
+                prevAnswers.forEach(val => {
+                    const savedBtn = optionsList.querySelector(`[data-value="${val}"]`);
+                    if (savedBtn) {
+                        savedBtn.classList.add('selected');
+                        savedBtn.querySelector('.checkbox-icon').style.display = 'none';
+                        savedBtn.querySelector('.checkbox-checked-icon').style.display = '';
+                        selectedAnswers.push(val);
+                    }
+                });
+                continueBtn.disabled = false;
+                continueBtn.style.opacity = '1';
+            } else {
+                selectedAnswers = [];
+                continueBtn.disabled = true;
+                continueBtn.style.opacity = '0.5';
+            }
+            selectedAnswer = null;
         } else {
+            // multiple_choice
+            continueBtn.style.display = '';
             const labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
             optionsList.innerHTML = q.options.map((opt, i) => `
                 <button class="option-btn" data-key="${labels[i]}" data-value="${opt.value}">
@@ -472,6 +621,12 @@ function loadQuestion(idx) {
             } else {
                 selectedAnswer = null;
             }
+        }
+
+        // Apply color accent to question card
+        const questionCard = questionScreen.querySelector('.question-card');
+        if (questionCard) {
+            questionCard.style.borderLeft = q.color ? `4px solid ${q.color}` : '';
         }
 
         optionsList.style.opacity = '1';
@@ -549,6 +704,7 @@ function restartForm() {
     currentQuestionIndex = 0;
     answers = {};
     selectedAnswer = null;
+    selectedAnswers = [];
     textValue = '';
     startTime = null;
 

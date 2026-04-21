@@ -140,6 +140,34 @@
         </div>
     </div>
 
+    <!-- Add Question Modal -->
+    <div class="modal" id="addQuestionModal">
+        <div class="modal-content add-question-modal-content">
+            <h2 class="modal-title">Tambah Item</h2>
+            <div class="add-question-cards">
+                <button class="add-question-card" id="addQuestionQuestion">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    <span class="add-card-title">Pertanyaan</span>
+                    <span class="add-card-desc">Pilihan ganda, kotak centang, atau isian teks</span>
+                </button>
+                <button class="add-question-card" id="addQuestionSection">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="12" x2="21" y2="12"/>
+                        <line x1="3" y1="6" x2="21" y2="6"/>
+                        <line x1="3" y1="18" x2="21" y2="18"/>
+                    </svg>
+                    <span class="add-card-title">Section</span>
+                    <span class="add-card-desc">Bagi form menjadi beberapa bagian</span>
+                </button>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelAddQuestion">Batal</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Delete Form Confirmation Modal -->
     <div class="modal" id="deleteFormModal">
         <div class="modal-content">
