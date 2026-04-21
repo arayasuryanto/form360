@@ -696,13 +696,13 @@ function renderFormList() {
         const questionCount = form.questions.length;
         const localCount = getRespondentsForForm(form.id).length;
         return `
-            <div class="form-item ${isActive ? 'active' : ''}">
-                <div class="form-item-main" onclick="selectForm('${form.id}')">
+            <div class="form-item ${isActive ? 'active' : ''}" data-form-id="${form.id}">
+                <div class="form-item-main">
                     <div class="form-item-title">${form.name || 'Tanpa Nama'}</div>
                     <div class="form-item-meta" id="meta-${form.id}">${questionCount} pertanyaan · ${localCount} responden</div>
                 </div>
                 <div class="form-item-actions">
-                    <button class="icon-btn export-btn" onclick="event.stopPropagation(); downloadFormExcel('${form.id}')" title="Export Excel">
+                    <button class="icon-btn export-btn" title="Export Excel">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                             <polyline points="14 2 14 8 20 8"/>
@@ -710,13 +710,13 @@ function renderFormList() {
                             <line x1="16" y1="17" x2="8" y2="17"/>
                         </svg>
                     </button>
-                    <button class="icon-btn view-btn" onclick="event.stopPropagation(); showRespondentsModal('${form.id}')" title="Lihat Responden">
+                    <button class="icon-btn view-btn" title="Lihat Responden">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                             <circle cx="12" cy="12" r="3"/>
                         </svg>
                     </button>
-                    <button class="icon-btn delete-btn" onclick="event.stopPropagation(); showDeleteFormModal('${form.id}')" title="Hapus Form">
+                    <button class="icon-btn delete-btn" title="Hapus Form">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="3 6 5 6 21 6"/>
                             <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
@@ -729,6 +729,18 @@ function renderFormList() {
             </div>
         `;
     }).join('');
+
+    // Wire up click handlers directly to buttons after render
+    formList.querySelectorAll('.form-item').forEach(item => {
+        const formId = item.getAttribute('data-form-id');
+        item.querySelector('.form-item-main').addEventListener('click', () => selectForm(formId));
+        const exportBtn = item.querySelector('.export-btn');
+        const viewBtn = item.querySelector('.view-btn');
+        const deleteBtn = item.querySelector('.delete-btn');
+        if (exportBtn) exportBtn.addEventListener('click', e => { e.stopPropagation(); downloadFormExcel(formId); });
+        if (viewBtn) viewBtn.addEventListener('click', e => { e.stopPropagation(); showRespondentsModal(formId); });
+        if (deleteBtn) deleteBtn.addEventListener('click', e => { e.stopPropagation(); showDeleteFormModal(formId); });
+    });
 
     // Auto-select first form if none selected
     if (!currentFormId && forms.length > 0) {
