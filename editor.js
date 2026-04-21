@@ -249,88 +249,115 @@ function copyShareLink() {
     });
 }
 
-function showRespondentsModal(formId) {
+async function showRespondentsModal(formId) {
     const form = forms.find(f => f.id === formId);
     if (!form) return;
 
-    const respondents = getRespondentsForForm(formId);
-
-    // Populate modal header
     document.getElementById('respondentsFormName').textContent = form.name;
-
-    // Render respondents list
-    const respondentsList = document.getElementById('respondentsList');
-    if (respondents.length === 0) {
-        respondentsList.innerHTML = `
-            <div class="empty-respondents">
-                <p>Belum ada responden</p>
-            </div>
-        `;
-    } else {
-        respondentsList.innerHTML = respondents.map((r, i) => `
-            <div class="respondent-item" onclick="showRespondentDetail('${formId}', ${r.id})">
-                <div class="respondent-info">
-                    <span class="respondent-number">#${i + 1}</span>
-                    <span class="respondent-time">${new Date(r.timestamp).toLocaleString('id-ID')}</span>
-                </div>
-                <div class="respondent-actions">
-                    <span class="time-badge">${r.timeTaken || '?'} detik</span>
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M6 12l4-4-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </div>
-            </div>
-        `).join('');
-    }
-
-    // Hide detail view when showing list
     document.getElementById('respondentDetail').style.display = 'none';
     document.getElementById('respondentsList').style.display = 'block';
-
     respondentsModal.classList.add('active');
+
+    const respondentsList = document.getElementById('respondentsList');
+    respondentsList.innerHTML = '<div class="empty-respondents"><p>Memuat...</p></div>';
+
+    // Try Supabase first, fall back to localStorage
+    let respondents = null;
+    if (sbClient && form.supabaseId) {
+        respondents = await fetchRespondentsFromSupabase(form.supabaseId);
+    }
+    if (respondents === null) {
+        respondents = getRespondentsForForm(formId);
+    }
+
+    if (respondents.length === 0) {
+        respondentsList.innerHTML = '<div class="empty-respondents"><p>Belum ada responden</p></div>';
+    } else {
+        respondentsList.innerHTML = respondents.map((r, i) => {
+            const ts = r.created_at ? new Date(r.created_at).toLocaleString('id-ID') : new Date(r.timestamp).toLocaleString('id-ID');
+            const duration = r.time_taken ?? r.timeTaken ?? '?';
+            return `
+                <div class="respondent-item" onclick="showRespondentDetail('${formId}', '${r.id}')">
+                    <div class="respondent-info">
+                        <span class="respondent-number">#${i + 1}</span>
+                        <span class="respondent-time">${ts}</span>
+                    </div>
+                    <div class="respondent-actions">
+                        <span class="time-badge">${duration} detik</span>
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <path d="M6 12l4-4-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
 }
 
 function hideRespondentsModal() {
     respondentsModal.classList.remove('active');
 }
 
-function showRespondentDetail(formId, respondentId) {
+async function showRespondentDetail(formId, respondentId) {
     const form = forms.find(f => f.id === formId);
-    const respondent = getRespondentData(formId, respondentId);
-    if (!form || !respondent) return;
+    if (!form) return;
 
-    // Update header with back button
+    document.getElementById('respondentsList').style.display = 'none';
+    document.getElementById('respondentDetail').style.display = 'block';
+
     const detailHeader = document.getElementById('respondentDetailHeader');
     detailHeader.innerHTML = `
-        <button class="back-btn" onclick="showRespondentsList('${formId}')">
+        <button class="back-btn" onclick="showRespondentsModal('${formId}')">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
             Kembali
         </button>
-        <span>Responden #${respondent.id}</span>
     `;
 
-    // Render answers
     const answersContainer = document.getElementById('respondentAnswers');
-    answersContainer.innerHTML = form.questions.map((q, i) => {
-        const answer = respondent.answers ? respondent.answers[q.id] : null;
-        const answerText = answer || (q.type === 'text_input' ? '-' : 'Tidak dijawab');
+    answersContainer.innerHTML = '<p style="color:var(--text-muted);font-size:0.9rem">Memuat jawaban...</p>';
 
-        return `
-            <div class="answer-item">
-                <div class="answer-question">${i + 1}. ${q.title || 'Pertanyaan tanpa judul'}</div>
-                <div class="answer-value">${answerText}</div>
-            </div>
-        `;
-    }).join('');
+    let answersMap = {};
 
-    // Show charts
-    renderRespondentCharts(form, respondent);
+    if (sbClient && form.supabaseId) {
+        // Load answers from Supabase
+        const rawAnswers = await fetchAnswersFromSupabase(respondentId);
+        rawAnswers.forEach(a => { answersMap[a.question_id] = a.answer_value; });
 
-    // Show detail, hide list
-    document.getElementById('respondentsList').style.display = 'none';
-    document.getElementById('respondentDetail').style.display = 'block';
+        // Build reverse map: local question id → supabase uuid
+        const qIdMap = form.supabaseQuestionIds || {};
+
+        answersContainer.innerHTML = form.questions.map((q, i) => {
+            const supabaseQId = qIdMap[q.id];
+            const answerText = (supabaseQId && answersMap[supabaseQId]) || '-';
+            return `
+                <div class="answer-item">
+                    <div class="answer-question">${i + 1}. ${q.title || 'Pertanyaan tanpa judul'}</div>
+                    <div class="answer-value">${answerText}</div>
+                </div>
+            `;
+        }).join('');
+
+        // Minimal chart placeholder using supabase data
+        renderRespondentCharts(form, { answers: Object.fromEntries(
+            form.questions.map(q => [q.id, answersMap[qIdMap[q.id]]])
+        )});
+    } else {
+        const respondent = getRespondentData(formId, respondentId);
+        if (respondent) {
+            answersContainer.innerHTML = form.questions.map((q, i) => {
+                const answer = respondent.answers ? respondent.answers[q.id] : null;
+                return `
+                    <div class="answer-item">
+                        <div class="answer-question">${i + 1}. ${q.title || 'Pertanyaan tanpa judul'}</div>
+                        <div class="answer-value">${answer || '-'}</div>
+                    </div>
+                `;
+            }).join('');
+            renderRespondentCharts(form, respondent);
+        }
+    }
 }
 
 function showRespondentsList(formId) {
@@ -423,6 +450,37 @@ function getAverageTimeForForm(formId) {
     return total / respondents.length;
 }
 
+async function fetchRespondentsFromSupabase(supabaseFormId) {
+    if (!sbClient || !supabaseFormId) return null;
+    try {
+        const { data, error } = await sbClient
+            .from('responses')
+            .select('id, time_taken, created_at')
+            .eq('form_id', supabaseFormId)
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        return data || [];
+    } catch (e) {
+        console.error('fetchRespondents error:', e);
+        return null;
+    }
+}
+
+async function fetchAnswersFromSupabase(responseId) {
+    if (!sbClient) return [];
+    try {
+        const { data, error } = await sbClient
+            .from('answers')
+            .select('question_id, answer_value')
+            .eq('response_id', responseId);
+        if (error) throw error;
+        return data || [];
+    } catch (e) {
+        console.error('fetchAnswers error:', e);
+        return [];
+    }
+}
+
 function getCurrentForm() {
     return forms.find(f => f.id === currentFormId);
 }
@@ -482,12 +540,12 @@ function renderFormList() {
     formList.innerHTML = forms.map(form => {
         const isActive = form.id === currentFormId;
         const questionCount = form.questions.length;
-        const respondentCount = getRespondentsForForm(form.id).length;
+        const localCount = getRespondentsForForm(form.id).length;
         return `
             <div class="form-item ${isActive ? 'active' : ''}">
                 <div class="form-item-main" onclick="selectForm('${form.id}')">
                     <div class="form-item-title">${form.name || 'Tanpa Nama'}</div>
-                    <div class="form-item-meta">${questionCount} pertanyaan · ${respondentCount} responden</div>
+                    <div class="form-item-meta" id="meta-${form.id}">${questionCount} pertanyaan · ${localCount} responden</div>
                 </div>
                 <div class="form-item-actions">
                     <button class="icon-btn view-btn" onclick="event.stopPropagation(); showRespondentsModal('${form.id}')" title="Lihat Responden">
@@ -505,6 +563,20 @@ function renderFormList() {
     if (!currentFormId && forms.length > 0) {
         selectForm(forms[0].id);
     }
+
+    // Async: refresh counts from Supabase
+    forms.forEach(async form => {
+        if (!sbClient || !form.supabaseId) return;
+        try {
+            const { count, error } = await sbClient
+                .from('responses')
+                .select('*', { count: 'exact', head: true })
+                .eq('form_id', form.supabaseId);
+            if (error || count === null) return;
+            const el = document.getElementById(`meta-${form.id}`);
+            if (el) el.textContent = `${form.questions.length} pertanyaan · ${count} responden`;
+        } catch (e) {}
+    });
 }
 
 function renderQuestions() {
