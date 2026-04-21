@@ -183,9 +183,9 @@
 #formDescription,
 #welcomeSubtitle {
     resize: vertical !important;
-    min-height: 70px !important;
     overflow: auto !important;
-    height: unset !important;
+    height: 72px !important;
+    min-height: 72px !important;
 }
 
 /* Questions List */
