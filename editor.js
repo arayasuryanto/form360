@@ -275,12 +275,14 @@ function confirmDelete() {
 }
 
 function showDeleteFormModal(formId) {
+    console.log('[DEBUG] showDeleteFormModal called, formId:', formId);
     const form = forms.find(f => f.id === formId);
-    if (!form) return;
+    if (!form) { console.log('[DEBUG] form not found!'); return; }
     formToDelete = formId;
     document.getElementById('deleteFormMsg').textContent =
         `Hapus "${form.name || 'Tanpa Nama'}"? Data responden akan tetap tersimpan.`;
     document.getElementById('deleteFormModal').classList.add('active');
+    console.log('[DEBUG] modal should now be visible, classList:', document.getElementById('deleteFormModal').classList.contains('active'));
 }
 
 function cancelDeleteForm() {
@@ -289,6 +291,7 @@ function cancelDeleteForm() {
 }
 
 async function confirmDeleteForm() {
+    console.log('[DEBUG] confirmDeleteForm called, formToDelete:', formToDelete);
     if (!formToDelete) return;
     const form = forms.find(f => f.id === formToDelete);
     if (form && form.supabaseId && sbClient) {
@@ -943,8 +946,14 @@ async function saveCurrentForm() {
 }
 
 async function downloadFormExcel(formId) {
+    console.log('[DEBUG] downloadFormExcel called, formId:', formId, 'typeof XLSX:', typeof XLSX);
     const form = forms.find(f => f.id === formId);
     if (!form) return;
+    if (typeof XLSX === 'undefined') {
+        console.error('[DEBUG] SheetJS (XLSX) not loaded!');
+        showToast(' Gagal: SheetJS belum dimuat', true);
+        return;
+    }
     showToast(' Menyiapkan file Excel...');
 
     // Gather respondents
@@ -1074,4 +1083,6 @@ window.showRespondentsModal = showRespondentsModal;
 window.showRespondentDetail = showRespondentDetail;
 window.showRespondentsList = showRespondentsList;
 window.showDeleteFormModal = showDeleteFormModal;
+window.cancelDeleteForm = cancelDeleteForm;
+window.confirmDeleteForm = confirmDeleteForm;
 window.downloadFormExcel = downloadFormExcel;
