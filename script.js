@@ -623,13 +623,20 @@ function loadQuestion(idx) {
             }
         }
 
-        // Apply color to full page background
+        // Apply color to full page and card — seamless
         const mainContainer = questionScreen;
-        if (mainContainer) {
-            if (q.color) {
-                mainContainer.style.background = q.color + '14';
-            } else {
-                mainContainer.style.background = '';
+        const questionCard = mainContainer ? mainContainer.querySelector('.question-card') : null;
+        if (q.color) {
+            mainContainer.style.background = q.color + '18';
+            if (questionCard) {
+                questionCard.style.background = q.color + '18';
+                questionCard.style.boxShadow = 'none';
+            }
+        } else {
+            mainContainer.style.background = '';
+            if (questionCard) {
+                questionCard.style.background = '';
+                questionCard.style.boxShadow = '';
             }
         }
 
