@@ -221,7 +221,7 @@ function initWelcomeScreen() {
     const welcomeTitleEl = document.getElementById('welcomeTitle');
     const welcomeSubtitleEl = document.getElementById('welcomeSubtitle');
     if (welcomeTitleEl) welcomeTitleEl.textContent = formConfig.welcome.title;
-    if (welcomeSubtitleEl) welcomeSubtitleEl.textContent = formConfig.welcome.subtitle;
+    if (welcomeSubtitleEl) welcomeSubtitleEl.innerHTML = (formConfig.welcome.subtitle || '').replace(/\n/g, '<br>');
 }
 
 function updateStepper() {
