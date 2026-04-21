@@ -3,149 +3,80 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Expert System - Homepage</title>
+    <title>Form360</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
 <body>
-    <!-- Homepage -->
-    <div id="homepage" class="container active">
-        <div class="card">
-            <h1>Sistem Pakar</h1>
-            <p class="subtitle">Silakan masukkan nama Anda untuk memulai</p>
-
-            <div class="input-group">
-                <label for="userName">Nama:</label>
-                <input type="text" id="userName" placeholder="Masukkan nama Anda" />
-            </div>
-
-            <button id="startBtn" class="btn btn-primary">Mulai</button>
+    <!-- Top Navigation Bar -->
+    <nav class="top-nav">
+        <div class="logo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="3" width="18" height="18" rx="4" stroke="currentColor" stroke-width="2"/>
+                <path d="M8 12h8M12 8v8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <span>Form360</span>
         </div>
-    </div>
+        <div class="dynamic-stepper" id="dynamicStepper"></div>
+        <div class="nav-spacer"></div>
+    </nav>
 
-    <!-- Questionnaire Page -->
-    <div id="questionnaire" class="container">
-        <div class="progress-bar">
-            <div id="progressFill" class="progress-fill"></div>
-        </div>
-
-        <div class="card questionnaire-card">
-            <div class="question-header">
-                <span id="questionNumber" class="question-number">Pertanyaan 1 dari 20</span>
-                <h2 id="questionTitle" class="question-title">Judul Pertanyaan</h2>
-            </div>
-
-            <div class="single-choice-container">
-                <div class="question-options">
-                    <label class="choice-option">
-                        <input type="radio" name="answer" value="visual" />
-                        <span class="option-text">Jawaban Visual</span>
-                    </label>
-
-                    <label class="choice-option">
-                        <input type="radio" name="answer" value="auditory" />
-                        <span class="option-text">Jawaban Auditory</span>
-                    </label>
-
-                    <label class="choice-option">
-                        <input type="radio" name="answer" value="kinesthetic" />
-                        <span class="option-text">Jawaban Kinesthetic</span>
-                    </label>
-                </div>
-
-            </div>
-
-            <div class="navigation-buttons">
-                <button id="prevBtn" class="btn btn-secondary">Sebelumnya</button>
-                <button id="nextBtn" class="btn btn-primary">Selanjutnya</button>
+    <!-- Start Screen -->
+    <main class="main-container">
+        <div class="form-container" id="startScreen">
+            <div class="question-card start-screen">
+                <h2 class="start-title" id="welcomeTitle">Halo, Selamat Datang!</h2>
+                <p class="start-subtitle" id="welcomeSubtitle">Tekan Mulai atau Enter untuk memulai</p>
+                <button class="continue-btn" id="startBtn">Mulai</button>
             </div>
         </div>
-    </div>
+    </main>
 
-    <!-- Results Page -->
-    <div id="resultsPage" class="container">
-        <div class="card results-card">
-            <h1 class="results-title">Hasil Gaya Belajar Anda</h1>
-            <p class="user-name">Nama: <span id="resultUserName"></span></p>
-
-            <!-- Results Section -->
-            <div class="cf-results">
-                <h2>Skor Gaya Belajar:</h2>
-
-                <!-- Visual -->
-                <div class="learning-style-result" id="visualResult">
-                    <div class="style-header">
-                        <div class="style-icon">👀</div>
-                        <div class="style-info">
-                            <h3>Visual</h3>
-                            <div class="cf-bar-container">
-                                <div class="cf-bar" id="visualBar"></div>
-                            </div>
-                            <p class="cf-value"><span id="visualCF">0</span>%</p>
-                        </div>
-                    </div>
+    <!-- Question Screen -->
+    <main class="main-container" id="questionScreen" style="display: none;">
+        <div class="form-container">
+            <div class="question-card">
+                <div class="question-indicator">
+                    <span class="q-number">1</span>
+                    <span class="q-arrow">→</span>
                 </div>
+                <h2 class="question-text"></h2>
+                <p class="question-hint">Pilih salah satu</p>
 
-                <!-- Auditory -->
-                <div class="learning-style-result" id="auditoryResult">
-                    <div class="style-header">
-                        <div class="style-icon">👂</div>
-                        <div class="style-info">
-                            <h3>Auditory</h3>
-                            <div class="cf-bar-container">
-                                <div class="cf-bar" id="auditoryBar"></div>
-                            </div>
-                            <p class="cf-value"><span id="auditoryCF">0</span>%</p>
-                        </div>
-                    </div>
-                </div>
+                <div class="options-list"></div>
 
-                <!-- Kinesthetic -->
-                <div class="learning-style-result" id="kinestheticResult">
-                    <div class="style-header">
-                        <div class="style-icon">🤸‍♂️</div>
-                        <div class="style-info">
-                            <h3>Kinesthetic</h3>
-                            <div class="cf-bar-container">
-                                <div class="cf-bar" id="kinestheticBar"></div>
-                            </div>
-                            <p class="cf-value"><span id="kinestheticCF">0</span>%</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Learning Style Combination -->
-            <div class="dominant-style">
-                <h2>Kombinasi Gaya Belajar Anda:</h2>
-                <div class="dominant-badge" id="dominantBadge">
-                    <span class="dominant-icon" id="dominantIcon">-</span>
-                    <span class="dominant-name" id="dominantName">-</span>
-                </div>
-            </div>
-
-            <!-- Recommendations Section -->
-            <div class="recommendations">
-                <h2>Rekomendasi Cara Belajar:</h2>
-                <div class="recommendation-content" id="recommendationContent">
-                    <p>Memuat rekomendasi...</p>
-                </div>
-            </div>
-
-            <!-- Action Buttons -->
-            <div class="result-actions">
-                <button id="restartBtn" class="btn btn-primary">Ulangi Test</button>
-                <button id="printBtn" class="btn btn-secondary">Cetak Hasil</button>
+                <button class="continue-btn" id="continueBtn" disabled>Continue</button>
             </div>
         </div>
-    </div>
+    </main>
 
-    <!-- Modal -->
-    <div id="modal" class="modal">
-        <div class="modal-content">
-            <span class="close">&times;</span>
-            <h2 id="modalTitle">Modal Title</h2>
-            <p id="modalMessage">Modal message content</p>
-            <button id="modalBtn" class="btn btn-primary">OK</button>
+    <!-- Results Screen -->
+    <main class="main-container" id="resultsScreen" style="display: none;">
+        <div class="form-container">
+            <div class="results-summary">
+                <h1 id="resultsTitle">Terima Kasih!</h1>
+                <p id="resultsSubtitle">Kamu telah menyelesaikan form ini</p>
+                <button class="continue-btn" id="restartBtn">Ikuti Lagi</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <div class="bottom-nav" id="bottomNav" style="display: none;">
+        <div class="scroll-indicator">
+            <span id="progressText">1/5</span>
+            <div class="scroll-arrows">
+                <button class="scroll-btn" id="scrollUp" disabled>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M12 10L8 6l-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+                <button class="scroll-btn" id="scrollDown">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
         </div>
     </div>
 

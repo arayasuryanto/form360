@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Form360 - Editor</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="editor-styles.css">
+</head>
+<body class="editor-mode">
+    <!-- Top Navigation -->
+    <nav class="top-nav">
+        <div class="logo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="3" width="18" height="18" rx="4" stroke="currentColor" stroke-width="2"/>
+                <path d="M8 12h8M12 8v8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <span>Form360 Editor</span>
+        </div>
+        <div class="nav-actions">
+            <button class="btn btn-secondary" id="previewBtn">Preview</button>
+            <button class="btn btn-secondary" id="shareBtn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                </svg>
+                Bagikan
+            </button>
+            <button class="btn btn-primary" id="saveBtn">Simpan</button>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <main class="editor-container">
+        <!-- Sidebar - Form List -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>Form Saya</h2>
+                <button class="btn btn-primary" id="newFormBtn">+ Form Baru</button>
+            </div>
+            <div class="form-list" id="formList">
+                <!-- Form items will be rendered here -->
+            </div>
+        </aside>
+
+        <!-- Editor Panel -->
+        <div class="editor-panel" id="editorPanel">
+            <!-- Form Settings -->
+            <div class="editor-section" id="formSettings">
+                <h3 class="section-title">Pengaturan Form</h3>
+                <div class="form-group">
+                    <label>Nama Form</label>
+                    <input type="text" id="formName" placeholder="Masukkan nama form">
+                </div>
+                <div class="form-group">
+                    <label>Deskripsi</label>
+                    <textarea id="formDescription" placeholder="Deskripsi form (opsional)" rows="2"></textarea>
+                </div>
+            </div>
+
+            <!-- Welcome Screen Editor -->
+            <div class="editor-section" id="welcomeEditor">
+                <h3 class="section-title">Layar Pembuka</h3>
+                <div class="form-group">
+                    <label>Judul</label>
+                    <input type="text" id="welcomeTitle" placeholder="Halo, Selamat Datang!">
+                </div>
+                <div class="form-group">
+                    <label>Subtitle</label>
+                    <input type="text" id="welcomeSubtitle" placeholder="Tekan Mulai atau Enter untuk memulai">
+                </div>
+            </div>
+
+            <!-- Questions Editor -->
+            <div class="editor-section" id="questionsEditor">
+                <h3 class="section-title">Pertanyaan</h3>
+                <div class="questions-list" id="questionsList">
+                    <!-- Questions will be rendered here -->
+                </div>
+                <button class="btn btn-secondary add-question-btn" id="addQuestionBtn">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    Tambah Pertanyaan
+                </button>
+            </div>
+
+            <!-- Results Editor -->
+            <div class="editor-section" id="resultsEditor">
+                <h3 class="section-title">Layar Hasil</h3>
+                <div class="form-group">
+                    <label>Judul</label>
+                    <input type="text" id="resultsTitle" placeholder="Terima Kasih!">
+                </div>
+                <div class="form-group">
+                    <label>Subtitle</label>
+                    <input type="text" id="resultsSubtitle" placeholder="Kamu telah menyelesaikan form ini">
+                </div>
+                <div class="form-group">
+                    <label>Tombol Ulangi</label>
+                    <input type="text" id="resultsButtonText" placeholder="Ikuti Lagi">
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Preview Modal -->
+    <div class="modal" id="previewModal">
+        <div class="modal-content preview-modal-content">
+            <button class="modal-close" id="closePreview">&times;</button>
+            <iframe id="previewFrame" src=""></iframe>
+        </div>
+    </div>
+
+    <!-- New Form Modal -->
+    <div class="modal" id="newFormModal">
+        <div class="modal-content">
+            <h2 class="modal-title">Form Baru</h2>
+            <div class="form-group">
+                <label>Nama Form</label>
+                <input type="text" id="newFormName" placeholder="Masukkan nama form">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelNewForm">Batal</button>
+                <button class="btn btn-primary" id="confirmNewForm">Buat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal" id="deleteModal">
+        <div class="modal-content">
+            <h2 class="modal-title">Hapus?</h2>
+            <p class="modal-message">Apakah kamu yakin ingin menghapus pertanyaan ini?</p>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelDelete">Batal</button>
+                <button class="btn btn-danger" id="confirmDelete">Hapus</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Respondents Modal -->
+    <div class="modal" id="respondentsModal">
+        <div class="modal-content respondents-modal-content">
+            <div class="respondents-header">
+                <h2 class="modal-title" id="respondentsFormName">Responden</h2>
+                <button class="modal-close" id="closeRespondents">&times;</button>
+            </div>
+            <div class="respondents-body">
+                <!-- List view -->
+                <div class="respondents-list" id="respondentsList">
+                    <!-- Respondent items will be rendered here -->
+                </div>
+                <!-- Detail view -->
+                <div class="respondent-detail" id="respondentDetail" style="display: none;">
+                    <div class="detail-header" id="respondentDetailHeader">
+                        <button class="back-btn" onclick="showRespondentsList(currentFormId)">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Kembali
+                        </button>
+                    </div>
+                    <div class="detail-charts">
+                        <div class="chart-card">
+                            <h4>Distribusi Jawaban</h4>
+                            <canvas id="answerPieChart" width="160" height="160"></canvas>
+                        </div>
+                        <div class="chart-card">
+                            <h4>Waktu Pengerjaan</h4>
+                            <div class="time-stats" id="timeStats">
+                                <!-- Time stats will be rendered here -->
+                            </div>
+                        </div>
+                    </div>
+                    <div class="detail-answers" id="respondentAnswers">
+                        <!-- Answers will be rendered here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Modal -->
+    <div class="modal" id="shareModal">
+        <div class="modal-content">
+            <h2 class="modal-title">Bagikan Form</h2>
+            <p class="share-description">Salin tautan di bawah ini dan bagikan ke responden</p>
+            <div class="share-link-container">
+                <input type="text" id="shareLink" readonly>
+                <button class="btn btn-primary copy-btn" id="copyLinkBtn">Salin</button>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="closeShareModal">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="editor.js"></script>
+</body>
+</html>
