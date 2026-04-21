@@ -157,6 +157,7 @@
     color: var(--text-primary);
     background: var(--white);
     transition: all 0.2s ease;
+    line-height: 1.5;
 }
 
 .form-group input:focus,
@@ -173,7 +174,9 @@
 }
 
 .form-group textarea {
-    resize: none;
+    resize: vertical;
+    height: auto;
+    min-height: 60px;
 }
 
 /* Questions List */
