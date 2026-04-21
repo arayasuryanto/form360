@@ -219,22 +219,6 @@ function setupEventListeners() {
     bind('cancelDeleteForm', 'click', cancelDeleteForm);
     bind('confirmDeleteForm', 'click', confirmDeleteForm);
 
-    // Event delegation for form list action buttons
-    formList.addEventListener('click', (e) => {
-        const btn = e.target.closest('.icon-btn');
-        if (!btn) return;
-        e.stopPropagation();
-        const formId = btn.dataset.formId;
-        if (!formId) return;
-        if (btn.classList.contains('export-btn')) {
-            downloadFormExcel(formId);
-        } else if (btn.classList.contains('view-btn')) {
-            showRespondentsModal(formId);
-        } else if (btn.classList.contains('delete-btn')) {
-            showDeleteFormModal(formId);
-        }
-    });
-
     if (formNameInput) formNameInput.addEventListener('input', updateFormSetting);
     if (formDescriptionInput) formDescriptionInput.addEventListener('input', updateFormSetting);
     if (welcomeTitleInput) welcomeTitleInput.addEventListener('input', updateFormSetting);
@@ -312,7 +296,6 @@ function cancelDeleteForm() {
 }
 
 async function confirmDeleteForm() {
-    console.log('confirmDeleteForm running, formToDelete:', formToDelete, 'forms count before:', forms.length);
     if (!formToDelete) return;
     const form = forms.find(f => f.id === formToDelete);
     if (form && form.supabaseId && sbClient) {
@@ -333,7 +316,6 @@ async function confirmDeleteForm() {
         m.classList.remove('active');
         m.style.cssText = '';
     }
-    console.log('confirmDeleteForm done, forms count after:', forms.length);
     showToast('Form dihapus');
     renderFormList();
     if (currentFormId) selectForm(currentFormId);
@@ -720,7 +702,7 @@ function renderFormList() {
                     <div class="form-item-meta" id="meta-${form.id}">${questionCount} pertanyaan · ${localCount} responden</div>
                 </div>
                 <div class="form-item-actions">
-                    <button class="icon-btn export-btn" data-form-id="${form.id}" title="Export Excel">
+                    <button class="icon-btn export-btn" onclick="event.stopPropagation(); downloadFormExcel('${form.id}')" title="Export Excel">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                             <polyline points="14 2 14 8 20 8"/>
@@ -728,13 +710,13 @@ function renderFormList() {
                             <line x1="16" y1="17" x2="8" y2="17"/>
                         </svg>
                     </button>
-                    <button class="icon-btn view-btn" data-form-id="${form.id}" title="Lihat Responden">
+                    <button class="icon-btn view-btn" onclick="event.stopPropagation(); showRespondentsModal('${form.id}')" title="Lihat Responden">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                             <circle cx="12" cy="12" r="3"/>
                         </svg>
                     </button>
-                    <button class="icon-btn delete-btn" data-form-id="${form.id}" title="Hapus Form">
+                    <button class="icon-btn delete-btn" onclick="event.stopPropagation(); showDeleteFormModal('${form.id}')" title="Hapus Form">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="3 6 5 6 21 6"/>
                             <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
