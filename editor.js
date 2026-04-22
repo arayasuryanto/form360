@@ -1184,7 +1184,9 @@ async function saveFormToSupabase(form) {
             .eq('form_id', supabaseId);
         const existingQIds = new Set((existingQs || []).map(q => q.id));
 
-        const newSupabaseIds = [];
+        const newSupabaseIds = new Array(form.questions.length).fill(null);
+        const questionsToInsert = [];
+
         for (let i = 0; i < form.questions.length; i++) {
             const q = form.questions[i];
             const qData = {
@@ -1203,15 +1205,29 @@ async function saveFormToSupabase(form) {
                 // Update existing question — preserves UUID so answers stay linked
                 const { error } = await sbClient.from('questions').update(qData).eq('id', sqId);
                 if (error) console.error('Question update error:', error);
-                newSupabaseIds.push(sqId);
+                newSupabaseIds[i] = sqId;
             } else {
-                // Insert new question
-                const { data: inserted, error } = await sbClient.from('questions').insert(qData).select();
-                if (error) console.error('Question insert error:', error);
-                if (inserted && inserted[0]) {
-                    newSupabaseIds.push(inserted[0].id);
-                    q.supabaseQId = inserted[0].id;
-                }
+                // Queue for batch insert
+                questionsToInsert.push({ index: i, data: qData });
+            }
+        }
+
+        // Batch insert new questions
+        if (questionsToInsert.length > 0) {
+            const insertData = questionsToInsert.map(item => item.data);
+            const { data: inserted, error: insertErr } = await sbClient
+                .from('questions')
+                .insert(insertData)
+                .select();
+            if (insertErr) {
+                console.error('Questions batch insert error:', insertErr);
+            } else if (inserted) {
+                questionsToInsert.forEach((item, idx) => {
+                    if (inserted[idx]) {
+                        newSupabaseIds[item.index] = inserted[idx].id;
+                        form.questions[item.index].supabaseQId = inserted[idx].id;
+                    }
+                });
             }
         }
 
@@ -1224,9 +1240,10 @@ async function saveFormToSupabase(form) {
         // Rebuild supabaseQuestionIds map
         form.supabaseQuestionIds = {};
         form.questions.forEach((q, i) => {
-            if (newSupabaseIds[i]) {
-                q.supabaseQId = newSupabaseIds[i];
-                form.supabaseQuestionIds[q.id] = newSupabaseIds[i];
+            const sbId = newSupabaseIds[i];
+            if (sbId) {
+                q.supabaseQId = sbId;
+                form.supabaseQuestionIds[q.id] = sbId;
             }
         });
 
