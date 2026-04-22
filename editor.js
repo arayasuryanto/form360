@@ -1200,6 +1200,7 @@ async function saveFormToSupabase(form) {
             const { data: qData, error: qErr } = await sbClient.from('questions').insert(questionsToInsert).select();
             if (qErr) {
                 console.error('Questions insert error:', qErr);
+                showToast('Questions save error: ' + (qErr.message || JSON.stringify(qErr)), true);
                 // Retry without color/image columns in case they don't exist
                 const retryInsert = form.questions.map((q, i) => ({
                     form_id: supabaseId,
@@ -1212,6 +1213,7 @@ async function saveFormToSupabase(form) {
                 const { data: qData2, error: qErr2 } = await sbClient.from('questions').insert(retryInsert).select();
                 if (qErr2) {
                     console.error('Questions retry insert error:', qErr2);
+                    showToast('Questions retry error: ' + (qErr2.message || JSON.stringify(qErr2)), true);
                 } else if (qData2) {
                     form.supabaseQuestionIds = {};
                     qData2.forEach((sq, i) => {
