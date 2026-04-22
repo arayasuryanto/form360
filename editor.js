@@ -134,10 +134,12 @@ async function fetchQuestionsForForm(supabaseFormId) {
         return (data || []).map((q, i) => {
             const base = {
                 id: i + 1,
-                supabaseQId: q.id,        // keep supabase UUID for answer mapping
+                supabaseQId: q.id,
                 type: q.question_type,
                 title: q.title || '',
-                placeholder: q.placeholder || ''
+                placeholder: q.placeholder || '',
+                color: q.color || null,
+                image: q.image ? (typeof q.image === 'string' ? JSON.parse(q.image) : q.image) : null
             };
             if ((q.question_type === 'multiple_choice' || q.question_type === 'checkbox') && q.options) {
                 base.options = typeof q.options === 'string' ? JSON.parse(q.options) : q.options;
@@ -576,26 +578,28 @@ async function showRespondentDetail(formId, respondentId) {
         const rawAnswers = await fetchAnswersFromSupabase(respondentId);
         rawAnswers.forEach(a => { answersMap[a.question_id] = a.answer_value; });
 
-        // Build qIdMap: local question id → supabase uuid
-        // If supabaseQuestionIds is missing/empty, rebuild it on the fly
-        let qIdMap = form.supabaseQuestionIds;
-        if (!qIdMap || Object.keys(qIdMap).length === 0) {
-            qIdMap = {};
+        // Ensure each question has supabaseQId — rebuild from Supabase if missing
+        let needsRebuild = form.questions.some(q => !q.supabaseQId);
+        if (needsRebuild) {
             const remoteQuestions = await fetchQuestionsForForm(form.supabaseId);
-            remoteQuestions.forEach(q => { qIdMap[q.id] = q.supabaseQId; });
-            form.supabaseQuestionIds = qIdMap;
-            form.questions = remoteQuestions;
+            // Match by order (both are ordered)
+            form.questions.forEach((q, i) => {
+                if (remoteQuestions[i]) {
+                    q.supabaseQId = remoteQuestions[i].supabaseQId;
+                }
+            });
+            form.supabaseQuestionIds = {};
+            form.questions.forEach(q => {
+                if (q.supabaseQId) form.supabaseQuestionIds[q.id] = q.supabaseQId;
+            });
             saveForms();
         }
 
         console.log('[DEBUG] rawAnswers from Supabase:', rawAnswers);
-        console.log('[DEBUG] qIdMap (local id → UUID):', qIdMap);
-        console.log('[DEBUG] form.supabaseId:', form.supabaseId);
-        console.log('[DEBUG] respondentId:', respondentId);
         console.log('[DEBUG] answersMap:', answersMap);
 
         answersContainer.innerHTML = form.questions.map((q, i) => {
-            const supabaseQId = qIdMap[q.id];
+            const supabaseQId = q.supabaseQId;
             let answerText = (supabaseQId && answersMap[supabaseQId]) || '-';
             // For checkbox, convert values to labels
             if (q.type === 'checkbox' && q.options && answerText !== '-') {
@@ -618,7 +622,7 @@ async function showRespondentDetail(formId, respondentId) {
 
         // Minimal chart placeholder using supabase data
         renderRespondentCharts(form, { answers: Object.fromEntries(
-            form.questions.map(q => [q.id, answersMap[qIdMap[q.id]]])
+            form.questions.map(q => [q.id, q.supabaseQId ? answersMap[q.supabaseQId] : undefined])
         )});
     } else {
         const respondent = getRespondentData(formId, respondentId);
@@ -1172,27 +1176,59 @@ async function saveFormToSupabase(form) {
             form.supabaseId = supabaseId;
         }
 
-        // Replace questions: delete old, insert new
-        await sbClient.from('questions').delete().eq('form_id', supabaseId);
-        const questionsToInsert = form.questions.map((q, i) => ({
-            form_id: supabaseId,
-            question_order: i + 1,
-            question_type: q.type,
-            title: q.title,
-            placeholder: q.type === 'section' ? (q.subtitle || '') : (q.placeholder || null),
-            options: q.options ? JSON.stringify(q.options) : null,
-            color: q.color || null,
-            image: q.image ? JSON.stringify(q.image) : null
-        }));
-        if (questionsToInsert.length > 0) {
-            const { data: qData, error: qErr } = await sbClient.from('questions').insert(questionsToInsert).select();
-            if (qErr) throw qErr;
-            // Map local question IDs to Supabase UUIDs for response linking
-            form.supabaseQuestionIds = {};
-            (qData || []).forEach((sq, i) => {
-                form.supabaseQuestionIds[form.questions[i].id] = sq.id;
-            });
+        // Replace questions: update existing, insert new, delete removed
+        // First, fetch current questions from Supabase
+        const { data: existingQs } = await sbClient
+            .from('questions')
+            .select('id')
+            .eq('form_id', supabaseId);
+        const existingQIds = new Set((existingQs || []).map(q => q.id));
+
+        const newSupabaseIds = [];
+        for (let i = 0; i < form.questions.length; i++) {
+            const q = form.questions[i];
+            const qData = {
+                form_id: supabaseId,
+                question_order: i + 1,
+                question_type: q.type,
+                title: q.title,
+                placeholder: q.type === 'section' ? (q.subtitle || '') : (q.placeholder || null),
+                options: q.options ? JSON.stringify(q.options) : null,
+                color: q.color || null,
+                image: q.image ? JSON.stringify(q.image) : null
+            };
+
+            const sqId = q.supabaseQId;
+            if (sqId && existingQIds.has(sqId)) {
+                // Update existing question — preserves UUID so answers stay linked
+                const { error } = await sbClient.from('questions').update(qData).eq('id', sqId);
+                if (error) console.error('Question update error:', error);
+                newSupabaseIds.push(sqId);
+            } else {
+                // Insert new question
+                const { data: inserted, error } = await sbClient.from('questions').insert(qData).select();
+                if (error) console.error('Question insert error:', error);
+                if (inserted && inserted[0]) {
+                    newSupabaseIds.push(inserted[0].id);
+                    q.supabaseQId = inserted[0].id;
+                }
+            }
         }
+
+        // Delete questions that no longer exist in the form
+        const toDelete = [...existingQIds].filter(id => !newSupabaseIds.includes(id));
+        if (toDelete.length > 0) {
+            await sbClient.from('questions').delete().in('id', toDelete);
+        }
+
+        // Rebuild supabaseQuestionIds map
+        form.supabaseQuestionIds = {};
+        form.questions.forEach((q, i) => {
+            if (newSupabaseIds[i]) {
+                q.supabaseQId = newSupabaseIds[i];
+                form.supabaseQuestionIds[q.id] = newSupabaseIds[i];
+            }
+        });
 
         return supabaseId;
     } catch (e) {
@@ -1274,11 +1310,7 @@ async function downloadFormExcel(formId) {
         }
     }
 
-    // Supabase question id map
-    const qIdMap = form.supabaseQuestionIds || {};
-    const reverseMap = {};
-    Object.entries(qIdMap).forEach(([localId, sbQId]) => { reverseMap[sbQId] = localId; });
-
+    // Ensure questions have supabaseQId
     const qList = form.questions;
     const fmt = v => (v === null || v === undefined || v === '') ? '-' : String(v);
 
@@ -1315,7 +1347,7 @@ async function downloadFormExcel(formId) {
 
         const qAnswers = qList.map(q => {
             if (q.type === 'section') return '-';
-            const sbQId = qIdMap[q.id];
+            const sbQId = q.supabaseQId;
             const localId = q.id;
             const val = ansMap[sbQId] ?? ansMap[String(localId)] ?? '-';
             if (val === '-' || val === null) return '-';
@@ -1346,7 +1378,7 @@ async function downloadFormExcel(formId) {
         } else if ((q.type === 'multiple_choice' || q.type === 'checkbox') && q.options) {
             const ans = (answersByResp[respondents[0]?.id] || []).length > 0
                 ? respondents.flatMap(r => (answersByResp[r.id] || []).map(a => {
-                    const sbQId = qIdMap[q.id];
+                    const sbQId = q.supabaseQId;
                     return a.question_id === sbQId ? a.answer_value : null;
                 })).filter(Boolean)
                 : [];
