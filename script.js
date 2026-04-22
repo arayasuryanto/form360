@@ -188,17 +188,29 @@ async function getFormFromSupabase(formId) {
 
         console.log('[VIEWER] Questions query - count:', questionsData?.length, 'error:', qError);
 
-        data.questions = (questionsData || []).map(q => ({
-            id: q.id,
-            type: q.question_type,
-            title: q.title,
-            placeholder: q.placeholder,
-            subtitle: q.question_type === 'section' ? (q.placeholder || '') : undefined,
-            buttonText: q.question_type === 'section' ? 'Continue' : undefined,
-            options: q.options ? JSON.parse(q.options) : null,
-            color: q.color || null,
-            image: q.image ? (typeof q.image === 'string' ? JSON.parse(q.image) : q.image) : null
-        }));
+        data.questions = (questionsData || []).map(q => {
+            // Detect real type
+            let realType = q.question_type;
+            let subtitle = '';
+            let buttonText = 'Continue';
+
+            if (q.question_type === 'text_input' && q.placeholder && q.placeholder.startsWith('__section__')) {
+                realType = 'section';
+                const parts = q.placeholder.split('__section__');
+                subtitle = parts[1] || '';
+                buttonText = parts[2] || 'Continue';
+            }
+
+            return {
+                id: q.id,
+                type: realType,
+                title: q.title,
+                placeholder: realType === 'section' ? '' : q.placeholder,
+                subtitle: realType === 'section' ? subtitle : undefined,
+                buttonText: realType === 'section' ? buttonText : undefined,
+                options: q.options ? JSON.parse(q.options) : null,
+            };
+        });
 
         return data;
     } catch (e) {

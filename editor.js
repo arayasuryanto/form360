@@ -132,21 +132,33 @@ async function fetchQuestionsForForm(supabaseFormId) {
             .order('question_order', { ascending: true });
         if (error) throw error;
         return (data || []).map((q, i) => {
+            // Detect real type from stored data
+            let realType = q.question_type;
+            let subtitle = '';
+            let buttonText = 'Continue';
+
+            // Check if this is a section stored as text_input
+            if (q.question_type === 'text_input' && q.placeholder && q.placeholder.startsWith('__section__')) {
+                realType = 'section';
+                const parts = q.placeholder.split('__section__');
+                subtitle = parts[1] || '';
+                buttonText = parts[2] || 'Continue';
+            }
+
             const base = {
                 id: i + 1,
                 supabaseQId: q.id,
-                type: q.question_type,
+                type: realType,
                 title: q.title || '',
-                placeholder: q.placeholder || '',
-                color: q.color || null,
-                image: q.image ? (typeof q.image === 'string' ? JSON.parse(q.image) : q.image) : null
+                placeholder: realType === 'section' ? '' : (q.placeholder || ''),
             };
-            if ((q.question_type === 'multiple_choice' || q.question_type === 'checkbox') && q.options) {
+
+            if ((realType === 'multiple_choice' || realType === 'checkbox') && q.options) {
                 base.options = typeof q.options === 'string' ? JSON.parse(q.options) : q.options;
             }
-            if (q.question_type === 'section') {
-                base.subtitle = q.placeholder || '';
-                base.buttonText = 'Continue';
+            if (realType === 'section') {
+                base.subtitle = subtitle;
+                base.buttonText = buttonText;
             }
             return base;
         });
@@ -1179,50 +1191,36 @@ async function saveFormToSupabase(form) {
         // First, delete all existing questions for this form (simpler, more reliable)
         await sbClient.from('questions').delete().eq('form_id', supabaseId);
 
+        // Map types to what Supabase constraint allows
+        // Supabase check constraint only allows: multiple_choice, text_input
+        // We store checkbox as 'multiple_choice' with a marker, section as 'text_input' with a marker
+        const MAP_TYPE_TO_SUPABASE = (type) => {
+            if (type === 'checkbox') return 'multiple_choice';
+            if (type === 'section') return 'text_input';
+            return type;
+        };
+
         // Insert all questions fresh
         if (form.questions.length > 0) {
             const questionsToInsert = form.questions.map((q, i) => {
-                const row = {
+                const sbType = MAP_TYPE_TO_SUPABASE(q.type);
+                return {
                     form_id: supabaseId,
                     question_order: i + 1,
-                    question_type: q.type,
+                    question_type: sbType,
                     title: q.title,
-                    placeholder: q.type === 'section' ? (q.subtitle || '') : (q.placeholder || null),
+                    placeholder: q.type === 'section'
+                        ? '__section__' + (q.subtitle || '') + '__section__' + (q.buttonText || 'Continue')
+                        : (q.placeholder || null),
                     options: q.options ? JSON.stringify(q.options) : null
                 };
-                // Only add these columns if they exist in Supabase
-                // (they may not if the table hasn't been migrated)
-                if (q.color) row.color = q.color;
-                if (q.image) row.image = JSON.stringify(q.image);
-                return row;
             });
 
             const { data: qData, error: qErr } = await sbClient.from('questions').insert(questionsToInsert).select();
             if (qErr) {
                 console.error('Questions insert error:', qErr);
-                showToast('Questions save error: ' + (qErr.message || JSON.stringify(qErr)), true);
-                // Retry without color/image columns in case they don't exist
-                const retryInsert = form.questions.map((q, i) => ({
-                    form_id: supabaseId,
-                    question_order: i + 1,
-                    question_type: q.type,
-                    title: q.title,
-                    placeholder: q.type === 'section' ? (q.subtitle || '') : (q.placeholder || null),
-                    options: q.options ? JSON.stringify(q.options) : null
-                }));
-                const { data: qData2, error: qErr2 } = await sbClient.from('questions').insert(retryInsert).select();
-                if (qErr2) {
-                    console.error('Questions retry insert error:', qErr2);
-                    showToast('Questions retry error: ' + (qErr2.message || JSON.stringify(qErr2)), true);
-                } else if (qData2) {
-                    form.supabaseQuestionIds = {};
-                    qData2.forEach((sq, i) => {
-                        form.questions[i].supabaseQId = sq.id;
-                        form.supabaseQuestionIds[form.questions[i].id] = sq.id;
-                    });
-                }
+                showToast('Questions save error: ' + (qErr.message || ''), true);
             } else if (qData) {
-                // Map local question IDs to Supabase UUIDs for response linking
                 form.supabaseQuestionIds = {};
                 qData.forEach((sq, i) => {
                     form.questions[i].supabaseQId = sq.id;
