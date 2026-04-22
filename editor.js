@@ -1176,76 +1176,58 @@ async function saveFormToSupabase(form) {
             form.supabaseId = supabaseId;
         }
 
-        // Replace questions: update existing, insert new, delete removed
-        // First, fetch current questions from Supabase
-        const { data: existingQs } = await sbClient
-            .from('questions')
-            .select('id')
-            .eq('form_id', supabaseId);
-        const existingQIds = new Set((existingQs || []).map(q => q.id));
+        // First, delete all existing questions for this form (simpler, more reliable)
+        await sbClient.from('questions').delete().eq('form_id', supabaseId);
 
-        const newSupabaseIds = new Array(form.questions.length).fill(null);
-        const questionsToInsert = [];
+        // Insert all questions fresh
+        if (form.questions.length > 0) {
+            const questionsToInsert = form.questions.map((q, i) => {
+                const row = {
+                    form_id: supabaseId,
+                    question_order: i + 1,
+                    question_type: q.type,
+                    title: q.title,
+                    placeholder: q.type === 'section' ? (q.subtitle || '') : (q.placeholder || null),
+                    options: q.options ? JSON.stringify(q.options) : null
+                };
+                // Only add these columns if they exist in Supabase
+                // (they may not if the table hasn't been migrated)
+                if (q.color) row.color = q.color;
+                if (q.image) row.image = JSON.stringify(q.image);
+                return row;
+            });
 
-        for (let i = 0; i < form.questions.length; i++) {
-            const q = form.questions[i];
-            const qData = {
-                form_id: supabaseId,
-                question_order: i + 1,
-                question_type: q.type,
-                title: q.title,
-                placeholder: q.type === 'section' ? (q.subtitle || '') : (q.placeholder || null),
-                options: q.options ? JSON.stringify(q.options) : null,
-                color: q.color || null,
-                image: q.image ? JSON.stringify(q.image) : null
-            };
-
-            const sqId = q.supabaseQId;
-            if (sqId && existingQIds.has(sqId)) {
-                // Update existing question — preserves UUID so answers stay linked
-                const { error } = await sbClient.from('questions').update(qData).eq('id', sqId);
-                if (error) console.error('Question update error:', error);
-                newSupabaseIds[i] = sqId;
-            } else {
-                // Queue for batch insert
-                questionsToInsert.push({ index: i, data: qData });
-            }
-        }
-
-        // Batch insert new questions
-        if (questionsToInsert.length > 0) {
-            const insertData = questionsToInsert.map(item => item.data);
-            const { data: inserted, error: insertErr } = await sbClient
-                .from('questions')
-                .insert(insertData)
-                .select();
-            if (insertErr) {
-                console.error('Questions batch insert error:', insertErr);
-            } else if (inserted) {
-                questionsToInsert.forEach((item, idx) => {
-                    if (inserted[idx]) {
-                        newSupabaseIds[item.index] = inserted[idx].id;
-                        form.questions[item.index].supabaseQId = inserted[idx].id;
-                    }
+            const { data: qData, error: qErr } = await sbClient.from('questions').insert(questionsToInsert).select();
+            if (qErr) {
+                console.error('Questions insert error:', qErr);
+                // Retry without color/image columns in case they don't exist
+                const retryInsert = form.questions.map((q, i) => ({
+                    form_id: supabaseId,
+                    question_order: i + 1,
+                    question_type: q.type,
+                    title: q.title,
+                    placeholder: q.type === 'section' ? (q.subtitle || '') : (q.placeholder || null),
+                    options: q.options ? JSON.stringify(q.options) : null
+                }));
+                const { data: qData2, error: qErr2 } = await sbClient.from('questions').insert(retryInsert).select();
+                if (qErr2) {
+                    console.error('Questions retry insert error:', qErr2);
+                } else if (qData2) {
+                    form.supabaseQuestionIds = {};
+                    qData2.forEach((sq, i) => {
+                        form.questions[i].supabaseQId = sq.id;
+                        form.supabaseQuestionIds[form.questions[i].id] = sq.id;
+                    });
+                }
+            } else if (qData) {
+                // Map local question IDs to Supabase UUIDs for response linking
+                form.supabaseQuestionIds = {};
+                qData.forEach((sq, i) => {
+                    form.questions[i].supabaseQId = sq.id;
+                    form.supabaseQuestionIds[form.questions[i].id] = sq.id;
                 });
             }
         }
-
-        // Delete questions that no longer exist in the form
-        const toDelete = [...existingQIds].filter(id => !newSupabaseIds.includes(id));
-        if (toDelete.length > 0) {
-            await sbClient.from('questions').delete().in('id', toDelete);
-        }
-
-        // Rebuild supabaseQuestionIds map
-        form.supabaseQuestionIds = {};
-        form.questions.forEach((q, i) => {
-            const sbId = newSupabaseIds[i];
-            if (sbId) {
-                q.supabaseQId = sbId;
-                form.supabaseQuestionIds[q.id] = sbId;
-            }
-        });
 
         return supabaseId;
     } catch (e) {
