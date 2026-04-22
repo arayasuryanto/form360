@@ -132,6 +132,12 @@ async function init() {
 
     // Check if form was loaded successfully
     if (questions.length === 0) {
+        // If no form param and not preview, redirect to editor
+        if (!formId && !formDataParam && !isPreview) {
+            window.location.href = '/';
+            return;
+        }
+
         const welcomeTitle = document.getElementById('welcomeTitle');
         const welcomeSubtitle = document.getElementById('welcomeSubtitle');
         const startBtnElement = document.getElementById('startBtn');

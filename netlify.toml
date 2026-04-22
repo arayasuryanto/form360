@@ -18,7 +18,15 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
 
+# Root goes to editor (index.html is served automatically)
+# /viewer.html serves the form viewer directly
+# Any other path that isn't a real file redirects to viewer
 [[redirects]]
-  from = "/*"
-  to = "/viewer.html"
+  from = "/f/*"
+  to = "/viewer.html?form=:splat"
+  status = 200
+
+[[redirects]]
+  from = "/s/*"
+  to = "/viewer.html?form=:splat"
   status = 200
