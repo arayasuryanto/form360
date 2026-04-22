@@ -1316,7 +1316,7 @@ async function downloadFormExcel(formId) {
 
     // ── Sheet 1: Ringkasan ──────────────────────────────────────────
     const ringkasanData = [
-        ['Form360 — Ringkasan'],
+        ['Formure — Ringkasan'],
         [],
         ['Nama Form', form.name || 'Tanpa Nama'],
         ['Jumlah Pertanyaan', qList.length],
@@ -1406,7 +1406,7 @@ async function downloadFormExcel(formId) {
     XLSX.utils.book_append_sheet(wb, wsResponden, 'Responden');
     XLSX.utils.book_append_sheet(wb, wsDist, 'Distribusi');
 
-    const filename = `Form360_${(form.name || 'form').replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    const filename = `Formure_${(form.name || 'form').replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`;
     XLSX.writeFile(wb, filename);
     showToast(' Excel diunduh!');
 }
