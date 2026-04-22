@@ -136,6 +136,9 @@ async function fetchQuestionsForForm(supabaseFormId) {
             let realType = q.question_type;
             let subtitle = '';
             let buttonText = 'Continue';
+            let color = null;
+            let image = null;
+            let options = null;
 
             // Check if this is a section stored as text_input
             if (q.question_type === 'text_input' && q.placeholder && q.placeholder.startsWith('__section__')) {
@@ -145,16 +148,33 @@ async function fetchQuestionsForForm(supabaseFormId) {
                 buttonText = parts[2] || 'Continue';
             }
 
+            // Parse options — may contain _color, _image, _realType metadata
+            if (q.options) {
+                const parsed = typeof q.options === 'string' ? JSON.parse(q.options) : q.options;
+                if (parsed && parsed._options !== undefined) {
+                    // New format with metadata
+                    options = parsed._options;
+                    color = parsed._color || null;
+                    image = parsed._image || null;
+                    if (parsed._realType) realType = parsed._realType;
+                } else {
+                    // Old format — plain options array
+                    options = parsed;
+                }
+            }
+
             const base = {
                 id: i + 1,
                 supabaseQId: q.id,
                 type: realType,
                 title: q.title || '',
                 placeholder: realType === 'section' ? '' : (q.placeholder || ''),
+                color: color,
+                image: image
             };
 
-            if ((realType === 'multiple_choice' || realType === 'checkbox') && q.options) {
-                base.options = typeof q.options === 'string' ? JSON.parse(q.options) : q.options;
+            if ((realType === 'multiple_choice' || realType === 'checkbox') && options) {
+                base.options = options;
             }
             if (realType === 'section') {
                 base.subtitle = subtitle;
@@ -1204,6 +1224,18 @@ async function saveFormToSupabase(form) {
         if (form.questions.length > 0) {
             const questionsToInsert = form.questions.map((q, i) => {
                 const sbType = MAP_TYPE_TO_SUPABASE(q.type);
+
+                // Encode color/image into options or placeholder since those columns don't exist
+                let optionsData = q.options || null;
+                if (optionsData || q.color || q.image || q.type === 'checkbox') {
+                    optionsData = {
+                        _options: q.options || null,
+                        _color: q.color || null,
+                        _image: q.image || null,
+                        _realType: q.type
+                    };
+                }
+
                 return {
                     form_id: supabaseId,
                     question_order: i + 1,
@@ -1212,7 +1244,7 @@ async function saveFormToSupabase(form) {
                     placeholder: q.type === 'section'
                         ? '__section__' + (q.subtitle || '') + '__section__' + (q.buttonText || 'Continue')
                         : (q.placeholder || null),
-                    options: q.options ? JSON.stringify(q.options) : null
+                    options: optionsData ? JSON.stringify(optionsData) : null
                 };
             });
 

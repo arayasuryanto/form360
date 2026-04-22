@@ -193,12 +193,28 @@ async function getFormFromSupabase(formId) {
             let realType = q.question_type;
             let subtitle = '';
             let buttonText = 'Continue';
+            let color = null;
+            let image = null;
+            let options = null;
 
             if (q.question_type === 'text_input' && q.placeholder && q.placeholder.startsWith('__section__')) {
                 realType = 'section';
                 const parts = q.placeholder.split('__section__');
                 subtitle = parts[1] || '';
                 buttonText = parts[2] || 'Continue';
+            }
+
+            // Parse options — may contain _color, _image, _realType metadata
+            if (q.options) {
+                const parsed = typeof q.options === 'string' ? JSON.parse(q.options) : q.options;
+                if (parsed && parsed._options !== undefined) {
+                    options = parsed._options;
+                    color = parsed._color || null;
+                    image = parsed._image || null;
+                    if (parsed._realType) realType = parsed._realType;
+                } else {
+                    options = parsed;
+                }
             }
 
             return {
@@ -208,7 +224,9 @@ async function getFormFromSupabase(formId) {
                 placeholder: realType === 'section' ? '' : q.placeholder,
                 subtitle: realType === 'section' ? subtitle : undefined,
                 buttonText: realType === 'section' ? buttonText : undefined,
-                options: q.options ? JSON.parse(q.options) : null,
+                options: options,
+                color: color,
+                image: image
             };
         });
 
