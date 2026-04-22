@@ -69,7 +69,9 @@ async function init() {
     // Try Supabase first if configured and formId is a valid UUID
     if (useSupabase && formId && isValidUUID(formId)) {
         try {
+            console.log('[VIEWER] Fetching form from Supabase, id:', formId);
             const formData = await getFormFromSupabase(formId);
+            console.log('[VIEWER] Form data result:', formData);
             if (formData) {
                 currentFormId = formData.id;
                 questions = formData.questions || [];
@@ -81,6 +83,8 @@ async function init() {
         } catch (e) {
             console.error('Supabase fetch failed:', e);
         }
+    } else {
+        console.log('[VIEWER] Skipping Supabase fetch. useSupabase:', useSupabase, 'formId:', formId);
     }
 
     // Check for URL-encoded form data (fallback / local sharing)
@@ -154,7 +158,10 @@ async function init() {
 
 // Supabase Functions
 async function getFormFromSupabase(formId) {
-    if (!sbClient) return null;
+    if (!sbClient) {
+        console.log('[VIEWER] No sbClient');
+        return null;
+    }
 
     try {
         const { data, error } = await sbClient
@@ -162,6 +169,8 @@ async function getFormFromSupabase(formId) {
             .select('*')
             .eq('id', formId)
             .single();
+
+        console.log('[VIEWER] Form query result - data:', data, 'error:', error);
 
         if (error || !data) return null;
 
@@ -171,13 +180,15 @@ async function getFormFromSupabase(formId) {
             .eq('form_id', formId)
             .order('question_order', { ascending: true });
 
+        console.log('[VIEWER] Questions query - count:', questionsData?.length, 'error:', qError);
+
         data.questions = (questionsData || []).map(q => ({
             id: q.id,
             type: q.question_type,
             title: q.title,
             placeholder: q.placeholder,
             subtitle: q.question_type === 'section' ? (q.placeholder || '') : undefined,
-            buttonText: q.question_type === 'section' ? 'Lanjut' : undefined,
+            buttonText: q.question_type === 'section' ? 'Continue' : undefined,
             options: q.options ? JSON.parse(q.options) : null,
             color: q.color || null,
             image: q.image ? (typeof q.image === 'string' ? JSON.parse(q.image) : q.image) : null

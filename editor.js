@@ -460,7 +460,7 @@ async function showShareModal() {
     shareBtn.innerHTML = 'Menyimpan...';
     shareBtn.disabled = true;
 
-    const baseUrl = window.location.origin + '/viewer.html';
+    const baseUrl = window.location.origin;
     let shareLink;
 
     // Save to Supabase for a clean UUID-based link
