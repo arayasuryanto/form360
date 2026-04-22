@@ -262,6 +262,85 @@ function setupEventListeners() {
             }
         });
     }
+
+    // Drag and drop for questions
+    let draggedQuestionId = null;
+    if (questionsList) {
+        questionsList.addEventListener('dragstart', (e) => {
+            const item = e.target.closest('.question-item');
+            if (!item) return;
+            draggedQuestionId = item.getAttribute('data-id');
+            item.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', draggedQuestionId);
+        });
+
+        questionsList.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const item = e.target.closest('.question-item');
+            if (!item || item.getAttribute('data-id') === draggedQuestionId) return;
+
+            // Remove all existing indicators
+            questionsList.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
+                el.classList.remove('drag-over-top', 'drag-over-bottom');
+            });
+
+            const rect = item.getBoundingClientRect();
+            const midY = rect.top + rect.height / 2;
+            if (e.clientY < midY) {
+                item.classList.add('drag-over-top');
+            } else {
+                item.classList.add('drag-over-bottom');
+            }
+        });
+
+        questionsList.addEventListener('dragleave', (e) => {
+            const item = e.target.closest('.question-item');
+            if (item) item.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
+
+        questionsList.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const form = getCurrentForm();
+            if (!form || !draggedQuestionId) return;
+
+            const targetItem = e.target.closest('.question-item');
+            if (!targetItem) return;
+            const targetId = targetItem.getAttribute('data-id');
+            if (targetId === draggedQuestionId) return;
+
+            const fromIdx = form.questions.findIndex(q => String(q.id) === draggedQuestionId);
+            const toIdx = form.questions.findIndex(q => String(q.id) === targetId);
+            if (fromIdx === -1 || toIdx === -1) return;
+
+            // Determine if inserting before or after target
+            const rect = targetItem.getBoundingClientRect();
+            const midY = rect.top + rect.height / 2;
+            const insertBefore = e.clientY < midY;
+
+            // Remove dragged item
+            const [moved] = form.questions.splice(fromIdx, 1);
+
+            // Calculate new insert index
+            let newIdx = form.questions.findIndex(q => String(q.id) === targetId);
+            if (!insertBefore) newIdx++;
+            form.questions.splice(newIdx, 0, moved);
+
+            // Renumber
+            form.questions.forEach((q, i) => q.id = i + 1);
+
+            saveForms();
+            renderQuestions();
+        });
+
+        questionsList.addEventListener('dragend', () => {
+            draggedQuestionId = null;
+            questionsList.querySelectorAll('.dragging, .drag-over-top, .drag-over-bottom').forEach(el => {
+                el.classList.remove('dragging', 'drag-over-top', 'drag-over-bottom');
+            });
+        });
+    }
 }
 
 function showNewFormModal() {
@@ -880,10 +959,46 @@ function renderQuestions() {
             `;
         }
 
+        // Image section
+        let imageSection = '';
+        if (q.type !== 'section') {
+            if (q.image && q.image.url) {
+                imageSection = `
+                    <div class="question-image-section">
+                        <div class="image-preview-frame" id="imgFrame-${q.id}">
+                            <img src="${q.image.url}" style="transform: scale(${q.image.zoom || 1}) translate(${q.image.offsetX || 0}%, ${q.image.offsetY || 0}%)" draggable="false">
+                            <button class="image-remove-btn" onclick="event.stopPropagation(); removeQuestionImage(${q.id})" title="Hapus gambar">&times;</button>
+                        </div>
+                        <div class="image-controls">
+                            <span class="image-controls-label">Zoom</span>
+                            <input type="range" class="image-zoom-slider" min="100" max="300" value="${Math.round((q.image.zoom || 1) * 100)}" oninput="updateImageZoom(${q.id}, this.value)">
+                            <span class="image-zoom-value">${Math.round((q.image.zoom || 1) * 100)}%</span>
+                        </div>
+                        <input type="file" accept="image/*" id="imgInput-${q.id}" style="display:none" onchange="handleImageUpload(${q.id}, this)">
+                    </div>
+                `;
+            } else {
+                imageSection = `
+                    <div class="question-image-section">
+                        <div class="image-upload-area" onclick="event.stopPropagation(); document.getElementById('imgInput-${q.id}').click()">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                <circle cx="8.5" cy="8.5" r="1.5"/>
+                                <polyline points="21 15 16 10 5 21"/>
+                            </svg>
+                            <span>Tambah Gambar</span>
+                        </div>
+                        <input type="file" accept="image/*" id="imgInput-${q.id}" style="display:none" onchange="handleImageUpload(${q.id}, this)">
+                    </div>
+                `;
+            }
+        }
+
         return `
-            <div class="question-item ${q.type === 'section' ? 'section-item' : ''}" data-id="${q.id}" style="${q.color ? 'background:' + q.color + '15;border-color:' + q.color + '40;' : ''}">
+            <div class="question-item ${q.type === 'section' ? 'section-item' : ''}" data-id="${q.id}" draggable="true" style="${q.color ? 'background:' + q.color + '15;border-color:' + q.color + '40;' : ''}">
                 <div class="question-header">
                     <div class="question-number">
+                        <span class="drag-handle" title="Seret untuk mengubah urutan">⠿</span>
                         ${badge}
                         ${typeSelect}
                     </div>
@@ -895,6 +1010,7 @@ function renderQuestions() {
                 </div>
                 <div class="question-fields">
                     ${fields}
+                    ${imageSection}
                 </div>
             </div>
         `;
@@ -1065,7 +1181,8 @@ async function saveFormToSupabase(form) {
             title: q.title,
             placeholder: q.type === 'section' ? (q.subtitle || '') : (q.placeholder || null),
             options: q.options ? JSON.stringify(q.options) : null,
-            color: q.color || null
+            color: q.color || null,
+            image: q.image ? JSON.stringify(q.image) : null
         }));
         if (questionsToInsert.length > 0) {
             const { data: qData, error: qErr } = await sbClient.from('questions').insert(questionsToInsert).select();
@@ -1262,6 +1379,164 @@ async function downloadFormExcel(formId) {
     showToast(' Excel diunduh!');
 }
 
+// Image upload functions
+async function handleImageUpload(questionId, input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+
+    const form = getCurrentForm();
+    const q = form.questions.find(q => q.id === questionId);
+    if (!q) return;
+
+    // Compress if > 2MB
+    let processedFile = file;
+    if (file.size > 2 * 1024 * 1024) {
+        try {
+            processedFile = await compressImage(file, 1200);
+        } catch (e) {
+            console.error('Image compression error:', e);
+        }
+    }
+
+    // Upload to Supabase Storage
+    if (sbClient) {
+        try {
+            const ext = file.name.split('.').pop() || 'jpg';
+            const path = `form-images/${form.id}/${questionId}_${Date.now()}.${ext}`;
+            const { data, error } = await sbClient.storage
+                .from('form-images')
+                .upload(path, processedFile, { upsert: true, contentType: file.type });
+
+            if (error) throw error;
+
+            const { data: urlData } = sbClient.storage.from('form-images').getPublicUrl(path);
+            q.image = { url: urlData.publicUrl, zoom: 1, offsetX: 0, offsetY: 0 };
+        } catch (e) {
+            console.error('Supabase upload error:', e);
+            showToast('Gagal upload gambar ke Supabase', true);
+            // Fallback: base64
+            const url = await fileToBase64(file);
+            q.image = { url, zoom: 1, offsetX: 0, offsetY: 0 };
+        }
+    } else {
+        // No Supabase: use base64
+        const url = await fileToBase64(file);
+        q.image = { url, zoom: 1, offsetX: 0, offsetY: 0 };
+    }
+
+    saveForms();
+    renderQuestions();
+    input.value = '';
+}
+
+function compressImage(file, maxWidth) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let w = img.width, h = img.height;
+            if (w > maxWidth) {
+                h = Math.round(h * maxWidth / w);
+                w = maxWidth;
+            }
+            canvas.width = w;
+            canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Canvas toBlob failed')), 'image/jpeg', 0.85);
+        };
+        img.onerror = reject;
+        img.src = URL.createObjectURL(file);
+    });
+}
+
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+function updateImageZoom(questionId, value) {
+    const form = getCurrentForm();
+    const q = form.questions.find(q => q.id === questionId);
+    if (!q || !q.image) return;
+    q.image.zoom = value / 100;
+    saveForms();
+    // Update live preview without full re-render
+    const frame = document.getElementById('imgFrame-' + questionId);
+    if (frame) {
+        const img = frame.querySelector('img');
+        if (img) img.style.transform = `scale(${q.image.zoom}) translate(${q.image.offsetX}%, ${q.image.offsetY}%)`;
+        const label = frame.parentElement.querySelector('.image-zoom-value');
+        if (label) label.textContent = value + '%';
+    }
+}
+
+async function removeQuestionImage(questionId) {
+    const form = getCurrentForm();
+    const q = form.questions.find(q => q.id === questionId);
+    if (!q || !q.image) return;
+
+    // Try to remove from Supabase Storage
+    if (sbClient && q.image.url && !q.image.url.startsWith('data:')) {
+        try {
+            const url = new URL(q.image.url);
+            const pathParts = url.pathname.split('/storage/v1/object/public/form-images/');
+            if (pathParts[1]) {
+                await sbClient.storage.from('form-images').remove([pathParts[1]]);
+            }
+        } catch (e) {}
+    }
+
+    q.image = null;
+    saveForms();
+    renderQuestions();
+}
+
+// Image pan (drag to reposition in editor)
+let imagePanState = null;
+
+document.addEventListener('mousedown', (e) => {
+    const frame = e.target.closest('.image-preview-frame');
+    if (!frame) return;
+    e.preventDefault();
+    const idStr = frame.id.replace('imgFrame-', '');
+    const form = getCurrentForm();
+    const q = form.questions.find(q => String(q.id) === idStr);
+    if (!q || !q.image) return;
+    imagePanState = { questionId: q.id, startX: e.clientX, startY: e.clientY, startOX: q.image.offsetX, startOY: q.image.offsetY };
+    frame.style.cursor = 'grabbing';
+});
+
+document.addEventListener('mousemove', (e) => {
+    if (!imagePanState) return;
+    const form = getCurrentForm();
+    const q = form.questions.find(q => q.id === imagePanState.questionId);
+    if (!q || !q.image) return;
+    const dx = (e.clientX - imagePanState.startX) / 2;
+    const dy = (e.clientY - imagePanState.startY) / 2;
+    q.image.offsetX = Math.max(-50, Math.min(50, imagePanState.startOX + dx));
+    q.image.offsetY = Math.max(-50, Math.min(50, imagePanState.startOY + dy));
+    const frame = document.getElementById('imgFrame-' + q.id);
+    if (frame) {
+        const img = frame.querySelector('img');
+        if (img) img.style.transform = `scale(${q.image.zoom}) translate(${q.image.offsetX}%, ${q.image.offsetY}%)`;
+    }
+});
+
+document.addEventListener('mouseup', () => {
+    if (imagePanState) {
+        const form = getCurrentForm();
+        const q = form.questions.find(q => q.id === imagePanState.questionId);
+        if (q && q.image) saveForms();
+        const frame = document.getElementById('imgFrame-' + imagePanState.questionId);
+        if (frame) frame.style.cursor = '';
+        imagePanState = null;
+    }
+});
+
 // Make functions available globally
 window.selectForm = selectForm;
 window.changeQuestionType = changeQuestionType;
@@ -1285,3 +1560,6 @@ window.setQuestionColor = setQuestionColor;
 window.addQuestion = addQuestion;
 window.confirmAddQuestion = confirmAddQuestion;
 window.cancelAddQuestion = cancelAddQuestion;
+window.handleImageUpload = handleImageUpload;
+window.updateImageZoom = updateImageZoom;
+window.removeQuestionImage = removeQuestionImage;

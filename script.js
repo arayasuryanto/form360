@@ -179,7 +179,8 @@ async function getFormFromSupabase(formId) {
             subtitle: q.question_type === 'section' ? (q.placeholder || '') : undefined,
             buttonText: q.question_type === 'section' ? 'Lanjut' : undefined,
             options: q.options ? JSON.parse(q.options) : null,
-            color: q.color || null
+            color: q.color || null,
+            image: q.image ? (typeof q.image === 'string' ? JSON.parse(q.image) : q.image) : null
         }));
 
         return data;
@@ -642,6 +643,18 @@ function loadQuestion(idx) {
 
         optionsList.style.opacity = '1';
         optionsList.style.transform = 'translateY(0)';
+
+        // Render question image if exists (not for sections)
+        const existingImg = questionScreen.querySelector('.question-image');
+        if (existingImg) existingImg.remove();
+
+        if (q.image && q.image.url && q.type !== 'section') {
+            const imgDiv = document.createElement('div');
+            imgDiv.className = 'question-image';
+            imgDiv.innerHTML = `<img src="${q.image.url}" style="transform: scale(${q.image.zoom || 1}) translate(${q.image.offsetX || 0}%, ${q.image.offsetY || 0}%)" draggable="false">`;
+            questionTextEl.parentNode.insertBefore(imgDiv, questionHintEl.nextSibling);
+        }
+
         setTimeout(() => { isTransitioning = false; }, 200);
     }, 200);
 }
