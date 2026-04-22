@@ -96,16 +96,16 @@ async function loadForms() {
                         const localForm = {
                             id: rf.id,            // use supabase UUID as local id for consistency
                             supabaseId: rf.id,
-                            name: rf.name || 'Tanpa Nama',
+                            name: rf.name || 'Untitled',
                             description: rf.description || '',
                             welcome: {
                                 title: rf.welcome_title || 'Halo, Selamat Datang!',
-                                subtitle: rf.welcome_subtitle || 'Tekan Mulai atau Enter untuk memulai'
+                                subtitle: rf.welcome_subtitle || 'Press Start or Enter to begin'
                             },
                             results: {
                                 title: rf.results_title || 'Terima Kasih!',
-                                subtitle: rf.results_subtitle || 'Kamu telah menyelesaikan form ini',
-                                buttonText: rf.results_button_text || 'Ikuti Lagi'
+                                subtitle: rf.results_subtitle || 'You have completed this form',
+                                buttonText: rf.results_button_text || 'Try Again'
                             },
                             questions: questions,
                             supabaseQuestionIds: qIdMap
@@ -146,7 +146,7 @@ async function fetchQuestionsForForm(supabaseFormId) {
             }
             if (q.question_type === 'section') {
                 base.subtitle = q.placeholder || '';
-                base.buttonText = 'Lanjut';
+                base.buttonText = 'Continue';
             }
             return base;
         });
@@ -160,19 +160,19 @@ function saveForms() {
     localStorage.setItem('form360_forms', JSON.stringify(forms));
 }
 
-function createNewFormData(name = 'Form Baru') {
+function createNewFormData(name = 'New Form') {
     return {
         id: Date.now().toString(),
         name: name,
         description: '',
         welcome: {
             title: 'Halo, Selamat Datang!',
-            subtitle: 'Tekan Mulai atau Enter untuk memulai'
+            subtitle: 'Press Start or Enter to begin'
         },
         results: {
             title: 'Terima Kasih!',
-            subtitle: 'Kamu telah menyelesaikan form ini',
-            buttonText: 'Ikuti Lagi'
+            subtitle: 'You have completed this form',
+            buttonText: 'Try Again'
         },
         questions: [
             createQuestionData(1, 'multiple_choice'),
@@ -191,14 +191,14 @@ function createQuestionData(id, type = 'multiple_choice') {
 
     if (type === 'multiple_choice' || type === 'checkbox') {
         base.options = [
-            { text: 'Opsi A', value: 'opt_a' },
-            { text: 'Opsi B', value: 'opt_b' },
-            { text: 'Opsi C', value: 'opt_c' },
-            { text: 'Opsi D', value: 'opt_d' }
+            { text: 'Option A', value: 'opt_a' },
+            { text: 'Option B', value: 'opt_b' },
+            { text: 'Option C', value: 'opt_c' },
+            { text: 'Option D', value: 'opt_d' }
         ];
     } else if (type === 'section') {
         base.subtitle = '';
-        base.buttonText = 'Lanjut';
+        base.buttonText = 'Continue';
     } else {
         base.placeholder = 'ketik jawaban kamu di sini...';
     }
@@ -356,7 +356,7 @@ function hideNewFormModal() {
 }
 
 function createNewForm() {
-    const name = document.getElementById('newFormName').value.trim() || 'Form Baru';
+    const name = document.getElementById('newFormName').value.trim() || 'New Form';
     const newForm = createNewFormData(name);
     forms.push(newForm);
     saveForms();
@@ -395,7 +395,7 @@ function showDeleteFormModal(formId) {
     formToDelete = formId;
     const msgEl = document.getElementById('deleteFormMsg');
     if (msgEl) {
-        msgEl.textContent = 'Hapus "' + (form.name || 'Tanpa Nama') + '"? Data responden akan tetap tersimpan.';
+        msgEl.textContent = 'Delete "' + (form.name || 'Untitled') + '"? Respondent data will be kept.';
     }
     const modal = document.getElementById('deleteFormModal');
     if (modal) {
@@ -430,7 +430,7 @@ async function confirmDeleteForm() {
         m.classList.remove('active');
         m.style.cssText = '';
     }
-    showToast('Form dihapus');
+    showToast('Form deleted');
     renderFormList();
     if (currentFormId) selectForm(currentFormId);
 }
@@ -493,7 +493,7 @@ function copyShareLink() {
     navigator.clipboard.writeText(shareLinkInput.value).then(() => {
         const copyBtn = document.getElementById('copyLinkBtn');
         const originalText = copyBtn.textContent;
-        copyBtn.textContent = 'Tersalin!';
+        copyBtn.textContent = 'Copied!';
         copyBtn.style.background = '#2e7d32';
         setTimeout(() => {
             copyBtn.textContent = originalText;
@@ -512,7 +512,7 @@ async function showRespondentsModal(formId) {
     respondentsModal.classList.add('active');
 
     const respondentsList = document.getElementById('respondentsList');
-    respondentsList.innerHTML = '<div class="empty-respondents"><p>Memuat...</p></div>';
+    respondentsList.innerHTML = '<div class="empty-respondents"><p>Loading...</p></div>';
 
     // Try Supabase first, fall back to localStorage
     let respondents = null;
@@ -524,7 +524,7 @@ async function showRespondentsModal(formId) {
     }
 
     if (respondents.length === 0) {
-        respondentsList.innerHTML = '<div class="empty-respondents"><p>Belum ada responden</p></div>';
+        respondentsList.innerHTML = '<div class="empty-respondents"><p>No respondents yet</p></div>';
     } else {
         respondentsList.innerHTML = respondents.map((r, i) => {
             const ts = r.created_at ? new Date(r.created_at).toLocaleString('id-ID') : new Date(r.timestamp).toLocaleString('id-ID');
@@ -536,7 +536,7 @@ async function showRespondentsModal(formId) {
                         <span class="respondent-time">${ts}</span>
                     </div>
                     <div class="respondent-actions">
-                        <span class="time-badge">${duration} detik</span>
+                        <span class="time-badge">${duration} sec</span>
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                             <path d="M6 12l4-4-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
@@ -569,7 +569,7 @@ async function showRespondentDetail(formId, respondentId) {
     `;
 
     const answersContainer = document.getElementById('respondentAnswers');
-    answersContainer.innerHTML = '<p style="color:var(--text-muted);font-size:0.9rem">Memuat jawaban...</p>';
+    answersContainer.innerHTML = '<p style="color:var(--text-muted);font-size:0.9rem">Loading answers...</p>';
 
     let answersMap = {};
 
@@ -611,7 +611,7 @@ async function showRespondentDetail(formId, respondentId) {
                 const opt = q.options.find(o => o.value === answerText);
                 if (opt) answerText = opt.text;
             }
-            const label = q.type === 'section' ? 'Section' : `${i + 1}. ${q.title || 'Pertanyaan tanpa judul'}`;
+            const label = q.type === 'section' ? 'Section' : `${i + 1}. ${q.title || 'Untitled question'}`;
             return `
                 <div class="answer-item">
                     <div class="answer-question">${label}</div>
@@ -699,16 +699,16 @@ function renderRespondentCharts(form, respondent) {
 
     const timeChartHtml = `
         <div class="time-stat">
-            <div class="time-value">${timeTaken} detik</div>
-            <div class="time-label">Waktu pengerjaan</div>
+            <div class="time-value">${timeTaken} sec</div>
+            <div class="time-label">Completion time</div>
         </div>
         <div class="time-stat">
-            <div class="time-value">${avgTime.toFixed(0)} detik</div>
-            <div class="time-label">Rata-rata</div>
+            <div class="time-value">${avgTime.toFixed(0)} sec</div>
+            <div class="time-label">Average</div>
         </div>
         <div class="time-stat ${timeComparison > 1.5 ? 'slow' : timeComparison < 0.5 ? 'fast' : ''}">
             <div class="time-value">${timeComparison > 1 ? '+' : ''}${((timeComparison - 1) * 100).toFixed(0)}%</div>
-            <div class="time-label">vs rata-rata</div>
+            <div class="time-label">vs average</div>
         </div>
     `;
     document.getElementById('timeStats').innerHTML = timeChartHtml;
@@ -781,7 +781,7 @@ function selectForm(formId) {
     welcomeSubtitleInput.value = form.welcome.subtitle;
     resultsTitleInput.value = form.results.title;
     resultsSubtitleInput.value = form.results.subtitle;
-    resultsButtonTextInput.value = form.results.buttonText || 'Ikuti Lagi';
+    resultsButtonTextInput.value = form.results.buttonText || 'Try Again';
 
     renderQuestions();
 }
@@ -844,8 +844,8 @@ function renderFormList() {
         return `
             <div class="form-item ${isActive ? 'active' : ''}" data-form-id="${form.id}">
                 <div class="form-item-main">
-                    <div class="form-item-title">${form.name || 'Tanpa Nama'}</div>
-                    <div class="form-item-meta" id="meta-${form.id}">${questionCount} pertanyaan · ${localCount} responden</div>
+                    <div class="form-item-title">${form.name || 'Untitled'}</div>
+                    <div class="form-item-meta" id="meta-${form.id}">${questionCount} questions · ${localCount} respondents</div>
                 </div>
                 <div class="form-item-actions">
                     <button class="icon-btn export-btn" title="Export Excel">
@@ -893,7 +893,7 @@ function renderFormList() {
                 .eq('form_id', form.supabaseId);
             if (error || count === null) return;
             const el = document.getElementById(`meta-${form.id}`);
-            if (el) el.textContent = `${form.questions.length} pertanyaan · ${count} responden`;
+            if (el) el.textContent = `${form.questions.length} questions · ${count} respondents`;
         } catch (e) {}
     });
 }
@@ -901,12 +901,12 @@ function renderFormList() {
 function renderQuestions() {
     const form = getCurrentForm();
     if (!form) {
-        questionsList.innerHTML = '<div class="placeholder-message"><h3>Pilih form untuk diedit</h3></div>';
+        questionsList.innerHTML = '<div class="placeholder-message"><h3>Select a form to edit</h3></div>';
         return;
     }
 
     if (form.questions.length === 0) {
-        questionsList.innerHTML = '<div class="placeholder-message"><h3>Belum ada pertanyaan</h3><p>Tambahkan pertanyaan baru</p></div>';
+        questionsList.innerHTML = '<div class="placeholder-message"><h3>No questions yet</h3><p>Add a new question</p></div>';
         return;
     }
 
@@ -936,29 +936,29 @@ function renderQuestions() {
         let fields = '';
         if (q.type === 'section') {
             fields = `
-                <input type="text" value="${q.title || ''}" placeholder="Judul Section..." onchange="updateQuestionTitle(${q.id}, this.value)">
-                <textarea placeholder="Subtitle (opsional)..." onchange="updateSectionSubtitle(${q.id}, this.value)" rows="2">${q.subtitle || ''}</textarea>
-                <input type="text" value="${q.buttonText || 'Lanjut'}" placeholder="Teks tombol..." onchange="updateSectionButtonText(${q.id}, this.value)">
+                <input type="text" value="${q.title || ''}" placeholder="Section title..." onchange="updateQuestionTitle(${q.id}, this.value)">
+                <textarea placeholder="Subtitle (optional)..." onchange="updateSectionSubtitle(${q.id}, this.value)" rows="2">${q.subtitle || ''}</textarea>
+                <input type="text" value="${q.buttonText || 'Continue'}" placeholder="Button text..." onchange="updateSectionButtonText(${q.id}, this.value)">
             `;
         } else if (q.type === 'text_input') {
             fields = `
-                <input type="text" value="${q.title}" placeholder="Pertanyaan..." onchange="updateQuestionTitle(${q.id}, this.value)">
-                <input type="text" value="${q.placeholder || ''}" placeholder="Placeholder (opsional)..." onchange="updateQuestionPlaceholder(${q.id}, this.value)">
+                <input type="text" value="${q.title}" placeholder="Question..." onchange="updateQuestionTitle(${q.id}, this.value)">
+                <input type="text" value="${q.placeholder || ''}" placeholder="Placeholder (optional)..." onchange="updateQuestionPlaceholder(${q.id}, this.value)">
             `;
         } else {
             // multiple_choice or checkbox — same options editor
             fields = `
-                <input type="text" value="${q.title}" placeholder="Pertanyaan..." onchange="updateQuestionTitle(${q.id}, this.value)">
+                <input type="text" value="${q.title}" placeholder="Question..." onchange="updateQuestionTitle(${q.id}, this.value)">
                 <div class="options-editor">
-                    <div class="options-label">${q.type === 'checkbox' ? 'Opsi (boleh pilih lebih dari satu):' : 'Opsi:'}</div>
+                    <div class="options-label">${q.type === 'checkbox' ? 'Options (multiple selection):' : 'Options:'}</div>
                     ${q.options.map((opt, i) => `
                         <div class="option-item">
                             <span class="option-key">${OPTION_KEYS[i]}</span>
-                            <input type="text" value="${opt.text}" placeholder="Opsi..." onchange="updateOptionText(${q.id}, ${i}, this.value)">
+                            <input type="text" value="${opt.text}" placeholder="Option..." onchange="updateOptionText(${q.id}, ${i}, this.value)">
                             <button class="option-delete-btn" onclick="deleteOption(${q.id}, ${i})">&times;</button>
                         </div>
                     `).join('')}
-                    ${q.options.length < 8 ? `<button class="add-option-btn" onclick="addOption(${q.id})">+ Tambah Opsi</button>` : ''}
+                    ${q.options.length < 8 ? `<button class="add-option-btn" onclick="addOption(${q.id})">+ Add Option</button>` : ''}
                 </div>
             `;
         }
@@ -971,7 +971,7 @@ function renderQuestions() {
                     <div class="question-image-section">
                         <div class="image-preview-frame" id="imgFrame-${q.id}">
                             <img src="${q.image.url}" style="transform: scale(${q.image.zoom || 1}) translate(${q.image.offsetX || 0}%, ${q.image.offsetY || 0}%)" draggable="false">
-                            <button class="image-remove-btn" onclick="event.stopPropagation(); removeQuestionImage(${q.id})" title="Hapus gambar">&times;</button>
+                            <button class="image-remove-btn" onclick="event.stopPropagation(); removeQuestionImage(${q.id})" title="Remove image">&times;</button>
                         </div>
                         <div class="image-controls">
                             <span class="image-controls-label">Zoom</span>
@@ -990,7 +990,7 @@ function renderQuestions() {
                                 <circle cx="8.5" cy="8.5" r="1.5"/>
                                 <polyline points="21 15 16 10 5 21"/>
                             </svg>
-                            <span>Tambah Gambar</span>
+                            <span>Add Image</span>
                         </div>
                         <input type="file" accept="image/*" id="imgInput-${q.id}" style="display:none" onchange="handleImageUpload(${q.id}, this)">
                     </div>
@@ -1002,7 +1002,7 @@ function renderQuestions() {
             <div class="question-item ${q.type === 'section' ? 'section-item' : ''}" data-id="${q.id}" draggable="true" style="${q.color ? 'background:' + q.color + '15;border-color:' + q.color + '40;' : ''}">
                 <div class="question-header">
                     <div class="question-number">
-                        <span class="drag-handle" title="Seret untuk mengubah urutan">⠿</span>
+                        <span class="drag-handle" title="Drag to reorder">⠿</span>
                         ${badge}
                         ${typeSelect}
                     </div>
@@ -1036,10 +1036,10 @@ function changeQuestionType(questionId, newType) {
     if (hasOptions && !hadOptions) {
         // Coming from text_input or section — add default options
         q.options = [
-            { text: 'Opsi A', value: 'opt_a' },
-            { text: 'Opsi B', value: 'opt_b' },
-            { text: 'Opsi C', value: 'opt_c' },
-            { text: 'Opsi D', value: 'opt_d' }
+            { text: 'Option A', value: 'opt_a' },
+            { text: 'Option B', value: 'opt_b' },
+            { text: 'Option C', value: 'opt_c' },
+            { text: 'Option D', value: 'opt_d' }
         ];
         delete q.placeholder;
         delete q.subtitle;
@@ -1136,7 +1136,7 @@ function addOption(questionId) {
     if (q && q.options && q.options.length < 8) {
         const newIndex = q.options.length;
         const key = OPTION_KEYS[newIndex];
-        q.options.push({ text: `Opsi ${key}`, value: `opt_${key.toLowerCase()}` });
+        q.options.push({ text: `Option ${key}`, value: `opt_${key.toLowerCase()}` });
         saveForms();
         renderQuestions();
     }
@@ -1156,7 +1156,7 @@ async function saveFormToSupabase(form) {
     if (!sbClient) return null;
     try {
         const formData = {
-            name: form.name || 'Form Baru',
+            name: form.name || 'New Form',
             description: form.description || '',
             welcome_title: form.welcome.title,
             welcome_subtitle: form.welcome.subtitle,
@@ -1261,13 +1261,13 @@ async function saveCurrentForm() {
     saveForms(); // persist supabaseId back to localStorage
     saveBtn.textContent = original;
     saveBtn.disabled = false;
-    showToast(id ? 'Form tersimpan!' : 'Tersimpan lokal (Supabase gagal)');
+    showToast(id ? 'Form saved!' : 'Saved locally (Supabase failed)');
 }
 
 async function downloadFormExcel(formId) {
     const form = forms.find(f => f.id === formId);
     if (!form) return;
-    showToast(' Menyiapkan file Excel...');
+    showToast(' Preparing Excel file...');
 
     // Load SheetJS dynamically if not already loaded
     if (typeof XLSX === 'undefined') {
@@ -1280,7 +1280,7 @@ async function downloadFormExcel(formId) {
                 document.head.appendChild(s);
             });
         } catch (e) {
-            showToast(' Gagal memuat pustaka Excel', true);
+            showToast(' Failed to load Excel library', true);
             return;
         }
     }
@@ -1288,7 +1288,7 @@ async function downloadFormExcel(formId) {
         showToast(' Gagal memuat pustaka Excel', true);
         return;
     }
-    showToast(' Menyiapkan file Excel...');
+    showToast(' Preparing Excel file...');
 
     // Gather respondents
     let respondents = [];
@@ -1318,26 +1318,26 @@ async function downloadFormExcel(formId) {
     const ringkasanData = [
         ['Formure — Ringkasan'],
         [],
-        ['Nama Form', form.name || 'Tanpa Nama'],
-        ['Jumlah Pertanyaan', qList.length],
-        ['Jumlah Responden', respondents.length],
-        ['Rata-rata Waktu', respondents.length > 0
-            ? Math.round(respondents.reduce((s, r) => s + (r.time_taken ?? r.timeTaken ?? 0), 0) / respondents.length) + ' detik'
+        ['Form Name', form.name || 'Untitled'],
+        ['Total Questions', qList.length],
+        ['Total Respondents', respondents.length],
+        ['Average Time', respondents.length > 0
+            ? Math.round(respondents.reduce((s, r) => s + (r.time_taken ?? r.timeTaken ?? 0), 0) / respondents.length) + ' sec'
             : '-'],
-        ['Responden Pertama', respondents.length > 0
+        ['First Respondent', respondents.length > 0
             ? (respondents[respondents.length - 1].created_at
-                ? new Date(respondents[respondents.length - 1].created_at).toLocaleString('id-ID')
+                ? new Date(respondents[respondents.length - 1].created_at).toLocaleString('en-US')
                 : '-')
             : '-'],
-        ['Responden Terakhir', respondents.length > 0
+        ['Last Respondent', respondents.length > 0
             ? (respondents[0].created_at
-                ? new Date(respondents[0].created_at).toLocaleString('id-ID')
+                ? new Date(respondents[0].created_at).toLocaleString('en-US')
                 : '-')
             : '-'],
     ];
 
     // ── Sheet 2: Responden ──────────────────────────────────────────
-    const respHeader = ['#', 'Waktu Submit', 'Durasi (detik)', ...qList.map((q, i) => `Q${i + 1}: ${fmt(q.title)}`)];
+    const respHeader = ['#', 'Submitted At', 'Duration (sec)', ...qList.map((q, i) => `Q${i + 1}: ${fmt(q.title)}`)];
     const respRows = respondents.map((r, i) => {
         const ts = r.created_at ? new Date(r.created_at).toLocaleString('id-ID') : '-';
         const dur = r.time_taken ?? r.timeTaken ?? '-';
@@ -1370,7 +1370,7 @@ async function downloadFormExcel(formId) {
     });
 
     // ── Sheet 3: Distribusi ────────────────────────────────────────
-    const distHeader = ['Pertanyaan', 'Opsi / Nilai', 'Jumlah', 'Persentase'];
+    const distHeader = ['Question', 'Option / Value', 'Count', 'Percentage'];
     const distRows = [];
     qList.forEach((q, qi) => {
         if (q.type === 'section') {
@@ -1402,13 +1402,13 @@ async function downloadFormExcel(formId) {
     wsResponden['!cols'] = [{ wch: 4 }, { wch: 22 }, { wch: 14 }, ...qList.map(() => ({ wch: 25 }))];
     wsDist['!cols'] = [{ wch: 35 }, { wch: 25 }, { wch: 10 }, { wch: 12 }];
 
-    XLSX.utils.book_append_sheet(wb, wsRingkasan, 'Ringkasan');
-    XLSX.utils.book_append_sheet(wb, wsResponden, 'Responden');
-    XLSX.utils.book_append_sheet(wb, wsDist, 'Distribusi');
+    XLSX.utils.book_append_sheet(wb, wsRingkasan, 'Summary');
+    XLSX.utils.book_append_sheet(wb, wsResponden, 'Respondents');
+    XLSX.utils.book_append_sheet(wb, wsDist, 'Distribution');
 
     const filename = `Formure_${(form.name || 'form').replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`;
     XLSX.writeFile(wb, filename);
-    showToast(' Excel diunduh!');
+    showToast(' Excel downloaded!');
 }
 
 // Image upload functions
@@ -1445,7 +1445,7 @@ async function handleImageUpload(questionId, input) {
             q.image = { url: urlData.publicUrl, zoom: 1, offsetX: 0, offsetY: 0 };
         } catch (e) {
             console.error('Supabase upload error:', e);
-            showToast('Gagal upload gambar ke Supabase', true);
+            showToast('Failed to upload image to Supabase', true);
             // Fallback: base64
             const url = await fileToBase64(file);
             q.image = { url, zoom: 1, offsetX: 0, offsetY: 0 };

@@ -4,13 +4,13 @@
 let questions = [];
 let formConfig = {
     welcome: {
-        title: 'Halo, Selamat Datang!',
-        subtitle: 'Tekan Mulai atau Enter untuk memulai'
+        title: 'Hello, Welcome!',
+        subtitle: 'Press Start or Enter to begin'
     },
     results: {
-        title: 'Terima Kasih!',
-        subtitle: 'Kamu telah menyelesaikan form ini',
-        buttonText: 'Ikuti Lagi'
+        title: 'Thank You!',
+        subtitle: 'You have completed this form',
+        buttonText: 'Try Again'
     }
 };
 
@@ -132,8 +132,8 @@ async function init() {
         const welcomeSubtitle = document.getElementById('welcomeSubtitle');
         const startBtnElement = document.getElementById('startBtn');
 
-        if (welcomeTitle) welcomeTitle.textContent = 'Form Tidak Ditemukan';
-        if (welcomeSubtitle) welcomeSubtitle.textContent = 'Form belum tersedia. Pastikan link yang digunakan benar.';
+        if (welcomeTitle) welcomeTitle.textContent = 'Form Not Found';
+        if (welcomeSubtitle) welcomeSubtitle.textContent = 'This form is not available. Make sure the link is correct.';
         if (startBtnElement) startBtnElement.style.display = 'none';
         return;
     }
@@ -249,7 +249,7 @@ function updateStepper() {
         html += `
             <div class="step-item mulai-step active">
                 <div class="step-circle"></div>
-                <span class="step-label">Mulai</span>
+                <span class="step-label">Start</span>
             </div>
             <div class="step-separator"></div>
             <div class="step-item question-step active">
@@ -503,7 +503,7 @@ function loadQuestion(idx) {
             questionHintEl.textContent = '';
         } else {
             questionTextEl.innerHTML = q.title;
-            questionHintEl.textContent = q.type === 'text_input' ? 'shift ↵ enter untuk baris baru' : (q.type === 'checkbox' ? 'Pilih satu atau lebih' : 'Pilih salah satu');
+            questionHintEl.textContent = q.type === 'text_input' ? 'shift ↵ enter for new line' : (q.type === 'checkbox' ? 'Select one or more' : 'Choose one');
         }
         questionTextEl.classList.remove('changing');
         questionHintEl.classList.remove('changing');
@@ -532,11 +532,11 @@ function loadQuestion(idx) {
             continueBtn.style.display = 'none';
         } else if (q.type === 'text_input') {
             continueBtn.style.display = '';
-            const placeholder = q.placeholder || 'ketik jawaban kamu di sini...';
+            const placeholder = q.placeholder || 'Type your answer here...';
             optionsList.innerHTML = `
                 <div class="text-input-container">
                     <textarea id="textAnswer" class="text-input" placeholder="${placeholder}" rows="4"></textarea>
-                    <div class="text-input-hint">shift ↵ enter untuk baris baru</div>
+                    <div class="text-input-hint">shift ↵ enter for new line</div>
                 </div>
             `;
 
@@ -694,7 +694,7 @@ async function showResults() {
                     <path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
             </div>
-            <span class="step-label">Selesai</span>
+            <span class="step-label">Done</span>
         </div>
     `;
     dynamicStepper.innerHTML = resultsHtml;
@@ -705,7 +705,7 @@ async function showResults() {
 
     document.getElementById('resultsTitle').textContent = formConfig.results.title;
     document.getElementById('resultsSubtitle').textContent = formConfig.results.subtitle;
-    restartBtn.textContent = formConfig.results.buttonText || 'Ikuti Lagi';
+    restartBtn.textContent = formConfig.results.buttonText || 'Try Again';
 
     createConfetti();
     isTransitioning = false;
