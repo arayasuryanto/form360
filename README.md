@@ -1,292 +1,101 @@
-# Form360 - Questionnaire Interface
+# Formure
 
-A minimalist, Typeform-inspired questionnaire interface with smooth animations and keyboard navigation.
+A minimalist, Typeform-inspired questionnaire builder with a focused respondent experience.
+
+- **Editor** (`index.html`) — sign-in gated form builder.
+- **Viewer** (`viewer.html`) — public, single-question-at-a-time respondent UI.
+- **Backend** — Supabase (Postgres + Auth + Storage).
+- **Hosting** — Netlify (static).
 
 ## Concept
 
-A clean, focused form experience that guides users through questions one at a time. The design emphasizes:
-- **Single-task focus**: One question visible at a time, centered on screen
-- **Minimal distractions**: Neutral broken-white background, no visual clutter
-- **Smooth transitions**: Animated question transitions and option reveals
-- **Keyboard-friendly**: Full keyboard navigation support (A/B/C/D, Enter, Arrow keys)
+A clean, focused form experience that guides users through questions one at a time:
 
----
+- **Single-task focus** — one question visible at a time, centered on screen.
+- **Minimal distractions** — neutral broken-white background, no clutter.
+- **Smooth transitions** — animated question transitions and option reveals.
+- **Keyboard-friendly** — full keyboard navigation (A/B/…, Enter, ↑/↓, Shift+Enter).
 
-## Design Language
+## Question types
 
-### Colors
-```css
---bg: #F7F7F7           /* Page background - broken white */
---card-bg: #EFEFEF        /* Card/question container */
---text-primary: #2D2D2D  /* Main text - dark charcoal */
---text-secondary: #6B6B6B /* Secondary text */
---text-muted: #A0A0A0    /* Hints, placeholders */
---border: #D8D8D8         /* Borders, dividers */
---white: #FFFFFF         /* Option buttons, inputs */
-```
+- `multiple_choice` — single select, A–H letter shortcuts.
+- `checkbox` — multi-select, A–H letter shortcuts.
+- `text_input` — free-form textarea.
+- `section` — divider screen with title, subtitle, and continue button.
 
-### Typography
-- Font: System font stack (`-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`)
-- Question text: 1.75rem, weight 400, line-height 1.4
-- Option text: 1rem, weight 500
-- Labels/hints: 0.8-0.9rem
+Per question you can also set a color tint, an image (uploaded to Supabase Storage), and a placeholder.
 
-### Layout
-- **Full viewport**: Form is centered and fixed, no scrolling
-- **Max width**: 640px for question card
-- **Padding**: 48px-56px on question card, 20px-40px on nav
-
----
-
-## UI Components
-
-### 1. Top Navigation (Stepper)
-
-Dynamic stepper showing progress through questions.
-
-**States:**
-- `mulai-step`: First question indicator with empty dot circle
-- `active`: Current question (black filled circle)
-- `completed`: Past question (circle with checkmark)
-- `hoverable`: Can hover for shadow effect on completed items
-
-**Behavior:**
-- On Question 1: Shows "Mulai" + current question number
-- On Question 2+: Shows question numbers only, shifting left as you progress
-- Only 3 question numbers visible at a time
-- Completed questions show checkmark and are clickable to navigate back
-- Results page shows all questions with checkmarks + "Selesai"
-
-### 2. Question Card
-
-Centered container for each question.
-
-**Structure:**
-```
-[Question Indicator: "1 →"]
-[Question Text: "Name, apa..."]
-[Question Hint: "Pilih salah satu" or "shift ↵ enter untuk baris baru"]
-
-[Options List / Text Input]
-[Continue Button]
-```
-
-**Animations:**
-- Card fade-in on initial load
-- Question text fades/changes on navigation
-- Options stagger in (0.2s, 0.3s, 0.4s delays)
-
-### 3. Option Buttons (Multiple Choice)
-
-**States:**
-- Default: White background, subtle border
-- Hover: Border darkens, slight lift (translateY -2px), shadow
-- Selected: Bold border, ring shadow, slight lift
-- Keyboard (A/B/C/D): Same visual as click selection
-
-**Structure:**
-```
-[A] Option text here...
-[B] Option text here...
-```
-
-- Letter key indicator on left (32x32px, rounded)
-- Selected state: key turns black with white text
-
-### 4. Text Input (Essay Question)
-
-**Structure:**
-- Textarea with inset shadow effect
-- Placeholder: "ketik jawaban kamu di sini..."
-- Hint below: "shift ↵ enter untuk baris baru"
-
-**Behavior:**
-- Enter to submit (without shift)
-- Shift+Enter for new line
-- Auto-focus on appear
-
-### 5. Continue Button
-
-**States:**
-- Disabled: Gray background, no cursor
-- Enabled: Black background, white text
-- Hover: Slight lift, deeper shadow
-- Click: Scale down briefly
-
-### 6. Bottom Navigation
-
-Scroll arrows showing current position.
-
-**Structure:**
-```
-[1/5]   [↑]
-        [↓]
-```
-
-- Arrow buttons disabled at first/last questions
-- Shows "X/Y" progress count
-
----
-
-## Features
-
-### Question Types
-
-1. **multiple_choice**: Select one from 2-4 options
-   - Options displayed as buttons with A/B/C/D keys
-   - Click or keypress to select
-
-2. **text_input**: Free-form text response
-   - Textarea with placeholder
-   - Enter submits, Shift+Enter for new line
-
-### Keyboard Navigation
-
-| Key | Action |
-|-----|--------|
-| A/B/C/D | Select option by letter |
-| Enter | Submit answer / Continue |
-| Arrow Up/Down | Navigate between questions |
-| Shift+Enter | New line in text input |
-
-### Answer Persistence
-
-- Answers are saved when navigating between questions
-- Returning to a question restores the previous selection/input
-- Visual indicator (checkmark) shows which questions have been answered
-
----
-
-## File Structure
+## Files
 
 ```
 sistempakar/
-├── index.html      # Main HTML structure
-├── styles.css      # All styles
-├── script.js       # All JavaScript logic
-└── README.md       # This documentation
+├── index.html         # Editor (auth-gated)
+├── viewer.html        # Respondent form
+├── editor.js          # Editor logic
+├── script.js          # Viewer logic
+├── styles.css         # Shared styles
+├── editor-styles.css  # Editor + auth gate styles
+├── config.js          # Runtime config (Supabase URL/key)
+├── supabase-schema.sql # Tables, RLS, functions
+├── netlify.toml       # Hosting + CSP headers
+├── xlsx.full.min.js   # SheetJS (lazy-loaded for Excel export)
+├── formure-logo.png
+└── favicon.png
 ```
 
-### Key JavaScript Variables
+## Setup
 
-```javascript
-questions[]     // Array of question objects
-answers{}       // Object storing {questionId: answer}
-currentQuestionIndex  // Current position (0-based)
-selectedAnswer   // Currently selected option (for multiple choice)
-textValue       // Current text input value
-isTransitioning // Prevents double-clicks during animations
-userName        // User's name from start screen
+### 1. Create the Supabase project
+
+Apply `supabase-schema.sql` in the Supabase SQL editor. It creates:
+
+- Tables: `forms`, `questions`, `responses`, `answers`.
+- RLS policies that scope reads/writes to the authenticated owner.
+- A `submit_response` RPC for atomically saving a response + answers.
+- A `form-images` Storage bucket should be created and made public for question images.
+
+### 2. Configure keys
+
+Edit `config.js`:
+
+```js
+window.FORMURE_CONFIG = {
+    SUPABASE_URL: 'https://your-project.supabase.co',
+    SUPABASE_KEY: 'your-anon-key'
+};
 ```
 
-### Adding Questions
+The anon key is safe to ship — Supabase RLS policies enforce ownership.
 
-Questions are defined in `script.js`:
+### 3. Enable email auth
 
-```javascript
-const questions = [
-    {
-        id: 1,
-        type: "multiple_choice",  // or "text_input"
-        title: "Question text here",
-        options: [
-            { text: "Option A", value: "option_a" },
-            { text: "Option B", value: "option_b" },
-            { text: "Option C", value: "option_c" }
-        ]
-    },
-    {
-        id: 2,
-        type: "text_input",
-        title: "Question text here",
-        hint: "shift ↵ enter untuk baris baru",
-        placeholder: "ketik jawaban kamu di sini..."
-    }
-];
-```
+In Supabase Auth settings, enable email/password sign-up. Existing users sign in with email + password from the editor's auth gate.
 
----
+### 4. Deploy
 
-## Customization
+Drag `sistempakar/` to Netlify or `netlify deploy --prod --dir sistempakar`.
 
-### Changing Colors
+## Sharing forms
 
-Edit the CSS variables at the top of `styles.css`:
+The editor's **Share** button validates the form, persists it to Supabase, and produces a link of the form `viewer.html?form=<uuid>`. The shorthand redirects `/f/<uuid>` and `/s/<uuid>` are configured in `netlify.toml`.
 
-```css
-:root {
-    --bg: #F7F7F7;
-    --card-bg: #EFEFEF;
-    --text-primary: #2D2D2D;
-    /* etc */
-}
-```
+## Security model
 
-### Changing Results Calculation
+- **Auth** — Supabase email/password. Editor is gated; viewer is public.
+- **Ownership** — `forms.owner_id` references `auth.users`. RLS lets only the owner read/write the form, its questions, and its responses.
+- **Public submissions** — anyone (no auth) can submit a response to a published form, but only the owner can read responses back.
+- **XSS** — all user-authored content is rendered via `textContent` / DOM APIs in both editor and viewer. CSP headers in `netlify.toml` are defense-in-depth.
+- **Respondent data on form delete** — `responses.form_id` uses `ON DELETE SET NULL` and snapshots the form name, so deleting a form does not destroy historical respondent data.
 
-The `calculateResults()` function in `script.js` maps answer values to result categories. Modify this to change how results are aggregated and displayed.
+## Keyboard shortcuts (viewer)
 
-### Adding New Question Types
+| Key | Action |
+|-----|--------|
+| A–H | Select / toggle option |
+| Enter | Continue |
+| Shift+Enter | New line in text input |
+| ↑ / ↓ | Previous / next question |
 
-1. Add type check in `loadQuestion()` function
-2. Create rendering logic for the new type
-3. Add validation in `handleContinue()`
-4. Handle keyboard shortcuts in `handleKeydown()`
+## Excel export
 
----
-
-## Browser Support
-
-- Modern browsers (Chrome, Firefox, Safari, Edge)
-- CSS custom properties (variables)
-- CSS animations and transitions
-- ES6+ JavaScript
-
----
-
-## Future Enhancements
-
-### Supabase Integration (Ready for Deployment)
-
-When ready to use Supabase as the database:
-
-**1. Create Supabase Project**
-- Go to https://supabase.com and create a project
-- Get your project URL and anon key from Settings > API
-
-**2. Set Environment Variables**
-
-Create `.env` file:
-```bash
-VITE_SUPABASE_URL=your-project-url
-VITE_SUPABASE_ANON_KEY=your-anon-key
-```
-
-**3. Run Database Schema**
-In Supabase SQL Editor, run `supabase-schema.sql` to create:
-- Tables: forms, questions, responses, answers
-- Functions: get_form_with_questions, submit_response
-- Row Level Security policies
-
-**4. Replace localStorage with Supabase**
-
-In `script.js`, replace localStorage calls with Supabase:
-```javascript
-// Instead of localStorage.getItem('form360_forms')
-// Use: const { data } = await supabase.rpc('get_form_with_questions', { form_id_param: formId })
-```
-
-**5. Deploy**
-
-Deploy to Netlify with:
-```bash
-netlify deploy --prod --dir=dist
-```
-
-### Network Deployment Notes
-
-- **Editor** (`editor.html`): For creating/editing forms
-- **Viewer** (`index.html`): For respondents to fill forms
-- Both can be hosted on Netlify
-- Form data is currently encoded in URL for sharing (no backend needed for small scale)
-- For production scale, use Supabase database integration
+The editor's per-form export button generates a workbook with three sheets: Summary, Respondents, Distribution. SheetJS is lazy-loaded only when the button is clicked.

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +7,7 @@
     <title>Formure</title>
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    <script src="config.js"></script>
 </head>
 <body>
     <!-- Top Navigation Bar -->
@@ -23,8 +24,8 @@
     <main class="main-container">
         <div class="form-container" id="startScreen">
             <div class="question-card start-screen">
-                <h2 class="start-title" id="welcomeTitle">Halo, Selamat Datang!</h2>
-                <p class="start-subtitle" id="welcomeSubtitle">Tekan Mulai atau Enter untuk memulai</p>
+                <h2 class="start-title" id="welcomeTitle">Hello, Welcome!</h2>
+                <p class="start-subtitle" id="welcomeSubtitle">Press Start or Enter to begin</p>
                 <button class="continue-btn" id="startBtn">Start</button>
             </div>
         </div>
@@ -39,7 +40,7 @@
                     <span class="q-arrow">→</span>
                 </div>
                 <h2 class="question-text"></h2>
-                <p class="question-hint">Pilih salah satu</p>
+                <p class="question-hint">Choose one</p>
 
                 <div class="options-list"></div>
 
@@ -52,9 +53,9 @@
     <main class="main-container" id="resultsScreen" style="display: none;">
         <div class="form-container">
             <div class="results-summary">
-                <h1 id="resultsTitle">Terima Kasih!</h1>
-                <p id="resultsSubtitle">Kamu telah menyelesaikan form ini</p>
-                <button class="continue-btn" id="restartBtn">Ikuti Lagi</button>
+                <h1 id="resultsTitle">Thank You!</h1>
+                <p id="resultsSubtitle">You have completed this form</p>
+                <button class="continue-btn" id="restartBtn">Try Again</button>
             </div>
         </div>
     </main>

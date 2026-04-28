@@ -25,3 +25,8 @@ npm-debug.log*
 # Editor temporary files
 *.swp
 *.swo
+
+# Supabase CLI local state (keep migrations, ignore secrets/temp)
+.supabase/
+supabase/.branches/
+supabase/.temp/
