@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+    <meta name="theme-color" content="#2D2D2D">
+    <title>Formure — Vibe Check</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;0,700;1,500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="vibe.css">
+</head>
+<body>
+    <nav class="vibe-nav">
+        <a class="vibe-logo" href="/">
+            <img src="formure-logo.png" alt="Formure" height="22">
+            <span>Vibe Check <em>· prototype</em></span>
+        </a>
+        <span class="vibe-progress" id="progress">0 / 6</span>
+    </nav>
+
+    <main class="vibe-stage">
+        <!-- LEFT: Question Panel -->
+        <section class="question-panel">
+            <div class="question-wrap" id="questionWrap"></div>
+            <div class="question-hint-row">
+                <span class="kbd">Enter</span>
+                <span class="kbd-label">to continue</span>
+            </div>
+        </section>
+
+        <!-- RIGHT: Live Vibe Card -->
+        <section class="card-panel">
+            <div class="vibe-card" id="vibeCard">
+                <div class="card-bg" id="cardBg"></div>
+                <svg class="card-decor card-decor-tl" viewBox="0 0 60 60"><path d="M5 30 Q 20 10, 40 25 T 55 50" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                <svg class="card-decor card-decor-tr" viewBox="0 0 60 60"><circle cx="30" cy="30" r="3" fill="currentColor"/><circle cx="45" cy="15" r="2" fill="currentColor"/><circle cx="15" cy="45" r="2.5" fill="currentColor"/><circle cx="50" cy="40" r="1.5" fill="currentColor"/></svg>
+                <svg class="card-decor card-decor-bl" viewBox="0 0 60 60"><path d="M30 10 L33 25 L48 27 L36 36 L40 50 L30 42 L20 50 L24 36 L12 27 L27 25 Z" fill="currentColor"/></svg>
+                <svg class="card-decor card-decor-br" viewBox="0 0 60 60"><path d="M5 5 L55 55 M5 55 L55 5 M30 5 L30 55 M5 30 L55 30" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+
+                <div class="card-body">
+                    <div class="card-meta-top">
+                        <span class="card-no" id="cardNo">№ —</span>
+                        <span class="card-date" id="cardDate"></span>
+                    </div>
+
+                    <div class="card-avatar" id="cardAvatar">
+                        <span class="card-initials" id="cardInitials">??</span>
+                    </div>
+
+                    <h2 class="card-name" id="cardName">your name</h2>
+                    <p class="card-tagline" id="cardTagline">tell us your vibe</p>
+
+                    <div class="card-symbol" id="cardSymbol">✦</div>
+
+                    <div class="card-words" id="cardWords">
+                        <span class="word word-empty">word</span>
+                        <span class="word word-empty">word</span>
+                        <span class="word word-empty">word</span>
+                    </div>
+
+                    <div class="card-footer">
+                        <span class="card-stamp" id="cardStamp">VIBE CARD</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-actions" id="cardActions">
+                <button class="btn-action btn-primary" id="downloadBtn">↓ Download Card</button>
+                <button class="btn-action btn-ghost" id="restartBtn">Try again</button>
+            </div>
+        </section>
+    </main>
+
+    <div class="confetti-layer" id="confettiLayer"></div>
+
+    <script src="vibe.js"></script>
+</body>
+</html>
