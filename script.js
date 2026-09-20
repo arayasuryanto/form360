@@ -1,10 +1,10 @@
 // Formure — Viewer
-// Loads forms via Supabase (anon key + RLS) or URL-encoded fallback for previews.
+// Loads forms via our own PocketBase (API rules gate public reads to published forms)
+// or URL-encoded fallback for previews.
 // All user-authored content is rendered with textContent or DOM APIs to prevent XSS.
 
 const cfg = window.FORMURE_CONFIG || {};
-const SUPABASE_URL = cfg.SUPABASE_URL || '';
-const SUPABASE_KEY = cfg.SUPABASE_KEY || '';
+const API_URL = cfg.API_URL || '';
 
 let questions = [];
 let formConfig = {
@@ -20,8 +20,8 @@ let selectedAnswers = [];
 let textValue = '';
 let isTransitioning = false;
 let startTime = null;
-let useSupabase = false;
-let sbClient = null;
+let useBackend = false;
+let pb = null;
 
 let dynamicStepper, startScreen, questionScreen, resultsScreen;
 let startBtn, continueBtn, restartBtn;
@@ -31,9 +31,9 @@ let optionsList, questionNumberEl, questionTextEl, questionHintEl;
 document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
-    if (SUPABASE_URL && SUPABASE_KEY && window.supabase) {
-        sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        useSupabase = true;
+    if (API_URL && window.PocketBase) {
+        pb = new PocketBase(API_URL);
+        useBackend = true;
     }
 
     const urlParams = new URLSearchParams(window.location.search);
@@ -56,9 +56,9 @@ async function init() {
     questionTextEl = document.querySelector('.question-text');
     questionHintEl = document.querySelector('.question-hint');
 
-    if (useSupabase && formId && isValidUUID(formId)) {
+    if (useBackend && formId && isValidFormId(formId)) {
         try {
-            const formData = await getFormFromSupabase(formId);
+            const formData = await getFormFromBackend(formId);
             if (formData) {
                 currentFormId = formData.id;
                 questions = formData.questions || [];
@@ -130,18 +130,22 @@ function decodeFormParam(param) {
     }
 }
 
-async function getFormFromSupabase(formId) {
-    if (!sbClient) return null;
-    const { data, error } = await sbClient.from('forms').select('*').eq('id', formId).single();
-    if (error || !data) return null;
+async function getFormFromBackend(formId) {
+    if (!pb) return null;
+    let data;
+    try {
+        data = await pb.collection('forms').getOne(formId);
+    } catch (e) { return null; }
 
-    const { data: questionsData } = await sbClient
-        .from('questions')
-        .select('*')
-        .eq('form_id', formId)
-        .order('question_order', { ascending: true });
+    let questionsData = [];
+    try {
+        questionsData = await pb.collection('questions').getFullList({
+            filter: pb.filter('form_id = {:formId}', { formId }),
+            sort: 'question_order'
+        });
+    } catch (e) {}
 
-    data.questions = (questionsData || []).map(normalizeQuestion);
+    data.questions = questionsData.map(normalizeQuestion);
     return data;
 }
 
@@ -187,30 +191,30 @@ function normalizeQuestion(q) {
     };
 }
 
-async function saveResponseToSupabase(timeTaken, answersArray) {
-    if (!sbClient) return false;
+async function saveResponseToBackend(timeTaken, answersArray) {
+    if (!pb) return false;
     try {
-        const { data: response, error: respError } = await sbClient
-            .from('responses')
-            .insert({ form_id: currentFormId, time_taken: timeTaken })
-            .select()
-            .single();
-        if (respError) throw respError;
+        const response = await pb.collection('responses').create({
+            form_id: currentFormId,
+            time_taken: timeTaken
+        });
 
-        const answersToInsert = answersArray.map(a => ({
-            response_id: response.id,
-            question_id: a.questionId,
-            answer_value: a.answer
-        }));
-        await sbClient.from('answers').insert(answersToInsert);
+        for (const a of answersArray) {
+            await pb.collection('answers').create({
+                response_id: response.id,
+                question_id: a.questionId,
+                answer_value: a.answer
+            });
+        }
         return true;
     } catch (e) {
         return false;
     }
 }
 
-function isValidUUID(str) {
-    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+function isValidFormId(str) {
+    // PocketBase record ids: 15-char alphanumeric.
+    return /^[a-zA-Z0-9]{15}$/.test(str);
 }
 
 function initWelcomeScreen() {
@@ -649,8 +653,8 @@ async function showResults() {
     const timeTaken = Math.round((Date.now() - startTime) / 1000);
     const answersArray = Object.entries(answers).map(([questionId, answer]) => ({ questionId, answer }));
 
-    if (useSupabase) {
-        await saveResponseToSupabase(timeTaken, answersArray);
+    if (useBackend) {
+        await saveResponseToBackend(timeTaken, answersArray);
     }
 
     dynamicStepper.replaceChildren();

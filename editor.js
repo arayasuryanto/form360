@@ -1,12 +1,11 @@
 // Formure — Editor
-// Source of truth: Supabase (RLS-gated by owner_id). localStorage is only a UI cache.
+// Source of truth: our own PocketBase (API rules gated by owner). localStorage is only a UI cache.
 // All user-authored content is rendered via DOM APIs (textContent / setAttribute) to prevent XSS.
 
 const cfg = window.FORMURE_CONFIG || {};
-const SUPABASE_URL = cfg.SUPABASE_URL || '';
-const SUPABASE_KEY = cfg.SUPABASE_KEY || '';
+const API_URL = cfg.API_URL || '';
 
-let sbClient = null;
+let pb = null;
 let currentUser = null;
 
 let forms = [];
@@ -34,17 +33,16 @@ const respondentsModal = document.getElementById('respondentsModal');
 document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
-    if (!window.supabase || !SUPABASE_URL || !SUPABASE_KEY) {
-        showAuthError('Supabase is not configured. See config.js.');
+    if (!window.PocketBase || !API_URL) {
+        showAuthError('PocketBase is not configured. See config.js.');
         return;
     }
-    sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    pb = new PocketBase(API_URL);
 
     setupAuth();
 
-    const { data: { session } } = await sbClient.auth.getSession();
-    if (session && session.user) {
-        currentUser = session.user;
+    if (pb.authStore.isValid && pb.authStore.record) {
+        currentUser = pb.authStore.record;
         await enterEditor();
     } else {
         showAuthGate();
@@ -91,16 +89,11 @@ function setupAuth() {
         submit.disabled = true;
         submit.textContent = mode === 'sign_up' ? 'Creating…' : 'Signing in…';
         try {
-            const fn = mode === 'sign_up' ? 'signUp' : 'signInWithPassword';
-            const { data, error } = await sbClient.auth[fn]({ email, password });
-            if (error) throw error;
-            if (mode === 'sign_up' && !data.session) {
-                showAuthError('Check your email to confirm the account, then sign in.');
-                submit.disabled = false;
-                submit.textContent = 'Create account';
-                return;
+            if (mode === 'sign_up') {
+                await pb.collection('users').create({ email, password, passwordConfirm: password });
             }
-            currentUser = data.user;
+            const auth = await pb.collection('users').authWithPassword(email, password);
+            currentUser = auth.record;
             await enterEditor();
         } catch (err) {
             showAuthError(err.message || 'Authentication failed.');
@@ -110,7 +103,7 @@ function setupAuth() {
     });
 
     bind('signOutBtn', 'click', async () => {
-        await sbClient.auth.signOut();
+        await pb.authStore.clear();
         location.reload();
     });
 }
@@ -155,7 +148,7 @@ async function enterEditor() {
 
 async function createDefaultForm() {
     const newForm = createNewFormData('My First Form');
-    const id = await persistFormToSupabase(newForm);
+    const id = await persistFormToBackend(newForm);
     if (id) {
         newForm.id = id;
         forms.push(newForm);
@@ -170,12 +163,10 @@ async function createDefaultForm() {
 // ─────────────────────────────────────────────────────────────────────
 
 async function loadForms() {
-    const { data: remoteForms, error } = await sbClient
-        .from('forms')
-        .select('*')
-        .eq('owner_id', currentUser.id)
-        .order('created_at', { ascending: true });
-    if (error) throw error;
+    const remoteForms = await pb.collection('forms').getFullList({
+        filter: pb.filter('owner_id = {:ownerId}', { ownerId: currentUser.id }),
+        sort: 'created_at'
+    });
 
     forms = [];
     for (const rf of (remoteForms || [])) {
@@ -193,13 +184,14 @@ async function loadForms() {
 }
 
 async function fetchQuestionsForForm(formId) {
-    const { data, error } = await sbClient
-        .from('questions')
-        .select('*')
-        .eq('form_id', formId)
-        .order('question_order', { ascending: true });
-    if (error) return [];
-    return (data || []).map(q => {
+    let data;
+    try {
+        data = await pb.collection('questions').getFullList({
+            filter: pb.filter('form_id = {:formId}', { formId }),
+            sort: 'question_order'
+        });
+    } catch (e) { return []; }
+    return data.map(q => {
         // Native columns are the source of truth; legacy fallback for older rows.
         let realType = q.question_type;
         let subtitle = q.subtitle || '';
@@ -288,6 +280,9 @@ function bind(id, event, fn) {
 
 function setupEventListeners() {
     bind('newFormBtn', 'click', showNewFormModal);
+    bind('aiFormBtn', 'click', showAiGenerateModal);
+    bind('cancelAiGenerate', 'click', hideAiGenerateModal);
+    bind('confirmAiGenerate', 'click', generateFormWithAi);
     bind('previewBtn', 'click', showPreview);
     bind('saveBtn', 'click', saveCurrentForm);
     bind('addQuestionBtn', 'click', addQuestion);
@@ -410,11 +405,104 @@ function hideNewFormModal() {
     newFormModal.classList.remove('active');
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// AI form generation
+// ─────────────────────────────────────────────────────────────────────
+
+function showAiGenerateModal() {
+    document.getElementById('aiBrief').value = '';
+    showAiError('');
+    document.getElementById('aiGenerateModal').classList.add('active');
+    setTimeout(() => document.getElementById('aiBrief').focus(), 100);
+}
+
+function hideAiGenerateModal() {
+    document.getElementById('aiGenerateModal').classList.remove('active');
+}
+
+function showAiError(msg) {
+    const el = document.getElementById('aiError');
+    if (!el) return;
+    el.textContent = msg;
+    el.style.display = msg ? 'block' : 'none';
+}
+
+function normalizeAiForm(data) {
+    const qs = Array.isArray(data.questions) ? data.questions : [];
+    const questions = qs.map(q => {
+        const type = ['multiple_choice', 'checkbox', 'text_input', 'section'].includes(q.type) ? q.type : 'text_input';
+        const item = { id: tempId(), type, title: q.title || 'Untitled question', color: null };
+        if ((type === 'multiple_choice' || type === 'checkbox') && Array.isArray(q.options) && q.options.length >= 2) {
+            item.options = q.options.map((o, i) => ({
+                text: (typeof o === 'string' ? o : o.text) || `Option ${i + 1}`,
+                value: `o${i + 1}`,
+                color: COLORS[i % COLORS.length]
+            }));
+        } else if (type === 'multiple_choice' || type === 'checkbox') {
+            item.options = createQuestionData(type).options;
+        } else if (type === 'section') {
+            item.subtitle = q.subtitle || '';
+            item.buttonText = q.buttonText || 'Continue';
+        } else {
+            item.placeholder = q.placeholder || 'Type your answer here...';
+        }
+        return item;
+    });
+    return {
+        id: null,
+        name: data.name || 'AI Form',
+        description: data.description || '',
+        welcome: {
+            title: (data.welcome && data.welcome.title) || data.name || 'Hello, Welcome!',
+            subtitle: (data.welcome && data.welcome.subtitle) || 'Press Start or Enter to begin'
+        },
+        results: {
+            title: (data.results && data.results.title) || 'Thank You!',
+            subtitle: (data.results && data.results.subtitle) || 'You have completed this form',
+            buttonText: (data.results && data.results.buttonText) || 'Try Again'
+        },
+        questions: questions.length > 0 ? questions : createNewFormData().questions
+    };
+}
+
+async function generateFormWithAi() {
+    const brief = document.getElementById('aiBrief').value.trim();
+    if (brief.length < 3) {
+        showAiError('Paste a brief first (a few lines is enough).');
+        return;
+    }
+    const btn = document.getElementById('confirmAiGenerate');
+    btn.disabled = true;
+    btn.textContent = 'Generating…';
+    showAiError('');
+    try {
+        const data = await pb.send('/ai/generate', { method: 'POST', body: { brief } });
+        const newForm = normalizeAiForm(data);
+        hideAiGenerateModal();
+        const id = await persistFormToBackend(newForm);
+        if (!id) {
+            showToast('Form generated but saving failed — check connection', true);
+            return;
+        }
+        newForm.id = id;
+        forms.push(newForm);
+        cacheForms();
+        renderFormList();
+        selectForm(id);
+        showToast(`Form "${newForm.name}" generated — ${newForm.questions.length} questions`);
+    } catch (e) {
+        showAiError((e && e.message) || 'Generation failed. Try again.');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Generate';
+    }
+}
+
 async function createNewForm() {
     const name = document.getElementById('newFormName').value.trim() || 'New Form';
     const newForm = createNewFormData(name);
     hideNewFormModal();
-    const id = await persistFormToSupabase(newForm);
+    const id = await persistFormToBackend(newForm);
     if (!id) {
         showToast('Could not create form', true);
         return;
@@ -464,8 +552,7 @@ function cancelDeleteForm() {
 async function confirmDeleteForm() {
     if (!formToDelete) return;
     try {
-        const { error } = await sbClient.from('forms').delete().eq('id', formToDelete);
-        if (error) throw error;
+        await pb.collection('forms').delete(formToDelete);
     } catch (e) {
         showToast('Delete failed: ' + (e.message || ''), true);
         return;
@@ -507,7 +594,7 @@ async function showShareModal() {
     const originalText = shareBtn.textContent;
     shareBtn.textContent = 'Saving…';
     shareBtn.disabled = true;
-    const id = await persistFormToSupabase(form);
+    const id = await persistFormToBackend(form);
     shareBtn.textContent = originalText;
     shareBtn.disabled = false;
     if (!id) {
@@ -564,7 +651,7 @@ async function showRespondentsModal(formId) {
     const respondentsList = document.getElementById('respondentsList');
     respondentsList.replaceChildren(emptyState('Loading...'));
 
-    let respondents = await fetchRespondentsFromSupabase(formId) || [];
+    let respondents = await fetchRespondentsFromBackend(formId) || [];
     respondentsList.replaceChildren();
 
     if (respondents.length === 0) {
@@ -634,7 +721,7 @@ async function showRespondentDetail(formId, respondentId) {
         textContent: 'Loading answers...', style: 'color:var(--text-muted);font-size:0.9rem'
     }));
 
-    const rawAnswers = await fetchAnswersFromSupabase(respondentId);
+    const rawAnswers = await fetchAnswersFromBackend(respondentId);
     const answersMap = {};
     rawAnswers.forEach(a => { answersMap[a.question_id] = a.answer_value; });
 
@@ -670,8 +757,7 @@ async function showRespondentDetail(formId, respondentId) {
 
 async function fetchRespondentMeta(respondentId) {
     try {
-        const { data } = await sbClient.from('responses').select('time_taken').eq('id', respondentId).single();
-        return data;
+        return await pb.collection('responses').getOne(respondentId);
     } catch (e) { return null; }
 }
 
@@ -721,26 +807,20 @@ function renderRespondentCharts(form, respondent) {
     timeStats.appendChild(stat);
 }
 
-async function fetchRespondentsFromSupabase(formId) {
+async function fetchRespondentsFromBackend(formId) {
     try {
-        const { data, error } = await sbClient
-            .from('responses')
-            .select('id, time_taken, created_at')
-            .eq('form_id', formId)
-            .order('created_at', { ascending: false });
-        if (error) throw error;
-        return data || [];
+        return await pb.collection('responses').getFullList({
+            filter: pb.filter('form_id = {:formId}', { formId }),
+            sort: '-created_at'
+        });
     } catch (e) { return null; }
 }
 
-async function fetchAnswersFromSupabase(responseId) {
+async function fetchAnswersFromBackend(responseId) {
     try {
-        const { data, error } = await sbClient
-            .from('answers')
-            .select('question_id, answer_value')
-            .eq('response_id', responseId);
-        if (error) throw error;
-        return data || [];
+        return await pb.collection('answers').getFullList({
+            filter: pb.filter('response_id = {:responseId}', { responseId })
+        });
     } catch (e) { return []; }
 }
 
@@ -862,13 +942,11 @@ function renderFormList() {
     forms.forEach(async form => {
         if (!form.id) return;
         try {
-            const { count, error } = await sbClient
-                .from('responses')
-                .select('*', { count: 'exact', head: true })
-                .eq('form_id', form.id);
-            if (error || count === null) return;
+            const page = await pb.collection('responses').getList(1, 1, {
+                filter: pb.filter('form_id = {:formId}', { formId: form.id })
+            });
             const el = document.getElementById('meta-' + form.id);
-            if (el) el.textContent = `${form.questions.length} questions · ${count} respondents`;
+            if (el) el.textContent = `${form.questions.length} questions · ${page.totalItems} respondents`;
         } catch (e) {}
     });
 }
@@ -1204,8 +1282,8 @@ function deleteOption(questionId, optionIndex) {
 // Persistence
 // ─────────────────────────────────────────────────────────────────────
 
-async function persistFormToSupabase(form) {
-    if (!sbClient || !currentUser) return null;
+async function persistFormToBackend(form) {
+    if (!pb || !currentUser) return null;
     try {
         const formData = {
             owner_id: currentUser.id,
@@ -1215,51 +1293,48 @@ async function persistFormToSupabase(form) {
             welcome_subtitle: form.welcome.subtitle,
             results_title: form.results.title,
             results_subtitle: form.results.subtitle,
-            results_button_text: form.results.buttonText
+            results_button_text: form.results.buttonText,
+            is_published: true
         };
 
         let formId = form.id && !String(form.id).startsWith('tmp_') ? form.id : null;
         if (formId) {
-            const { error } = await sbClient.from('forms').update(formData).eq('id', formId);
-            if (error) throw error;
+            await pb.collection('forms').update(formId, formData);
         } else {
-            const { data, error } = await sbClient.from('forms').insert(formData).select().single();
-            if (error) throw error;
-            formId = data.id;
+            const rec = await pb.collection('forms').create(formData);
+            formId = rec.id;
         }
 
-        // Resync questions: keep existing UUIDs, add new ones, drop deleted ones.
-        const { data: existing } = await sbClient.from('questions').select('id').eq('form_id', formId);
-        const existingIds = new Set((existing || []).map(q => q.id));
+        // Resync questions: keep existing ids, add new ones, drop deleted ones.
+        const existing = await pb.collection('questions').getFullList({
+            filter: pb.filter('form_id = {:formId}', { formId }),
+            fields: 'id'
+        });
+        const existingIds = new Set(existing.map(q => q.id));
         const keepIds = new Set(form.questions.filter(q => q.id && !String(q.id).startsWith('tmp_')).map(q => q.id));
         const toDelete = [...existingIds].filter(id => !keepIds.has(id));
-        if (toDelete.length > 0) await sbClient.from('questions').delete().in('id', toDelete);
+        for (const id of toDelete) {
+            await pb.collection('questions').delete(id);
+        }
 
         // Upsert each question with a stable order
         const ops = form.questions.map((q, i) => buildQuestionRow(formId, q, i + 1));
-        const toInsert = ops.filter(op => op.isNew).map(op => op.row);
+        const newOps = ops.filter(op => op.isNew);
         const toUpdate = ops.filter(op => !op.isNew);
 
-        if (toInsert.length > 0) {
-            const { data: inserted, error } = await sbClient.from('questions').insert(toInsert).select();
-            if (error) throw error;
-            // Map tmp ids → real UUIDs
-            ops.filter(op => op.isNew).forEach((op, idx) => {
-                const newId = inserted[idx]?.id;
-                if (newId) {
-                    const q = form.questions.find(qq => qq.id === op.tmpId);
-                    if (q) q.id = newId;
-                }
-            });
+        for (const op of newOps) {
+            const rec = await pb.collection('questions').create(op.row);
+            const q = form.questions.find(qq => qq.id === op.tmpId);
+            if (q) q.id = rec.id;
         }
         for (const op of toUpdate) {
-            await sbClient.from('questions').update(op.row).eq('id', op.id);
+            await pb.collection('questions').update(op.id, op.row);
         }
 
         form.id = formId;
         return formId;
     } catch (e) {
-        console.error('persistFormToSupabase error:', e);
+        console.error('persistFormToBackend error:', e);
         return null;
     }
 }
@@ -1305,7 +1380,7 @@ async function saveCurrentForm() {
     const original = saveBtn.textContent;
     saveBtn.textContent = 'Saving…';
     saveBtn.disabled = true;
-    const id = await persistFormToSupabase(form);
+    const id = await persistFormToBackend(form);
     saveBtn.textContent = original;
     saveBtn.disabled = false;
     if (id) {
@@ -1345,10 +1420,10 @@ async function downloadFormExcel(formId) {
         return;
     }
 
-    const respondents = await fetchRespondentsFromSupabase(formId) || [];
+    const respondents = await fetchRespondentsFromBackend(formId) || [];
     const answersByResp = {};
     for (const r of respondents) {
-        answersByResp[r.id] = await fetchAnswersFromSupabase(r.id);
+        answersByResp[r.id] = await fetchAnswersFromBackend(r.id);
     }
 
     const qList = form.questions;
@@ -1449,18 +1524,18 @@ async function handleImageUpload(questionId, input) {
     if (file.size > 2 * 1024 * 1024) {
         try { processedFile = await compressImage(file, 1200); } catch (e) {}
     }
-    if (sbClient && form.id && !String(form.id).startsWith('tmp_')) {
+    if (pb && form.id && !String(form.id).startsWith('tmp_')) {
         try {
-            const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
-            const path = `form-images/${form.id}/${questionId}_${Date.now()}.${ext}`;
-            const { error } = await sbClient.storage.from('form-images').upload(path, processedFile, { upsert: true, contentType: file.type });
-            if (error) throw error;
-            const { data: urlData } = sbClient.storage.from('form-images').getPublicUrl(path);
-            q.image = { url: urlData.publicUrl, zoom: 1, offsetX: 0, offsetY: 0 };
+            const fd = new FormData();
+            fd.append('file', processedFile);
+            const rec = await pb.collection('form_images').create(fd);
+            const getUrl = pb.files.getURL || pb.files.getUrl;
+            const url = getUrl.call(pb.files, rec, rec.file);
+            q.image = { url, zoom: 1, offsetX: 0, offsetY: 0 };
         } catch (e) {
             const url = await fileToBase64(processedFile);
             q.image = { url, zoom: 1, offsetX: 0, offsetY: 0 };
-            showToast('Stored image inline (Supabase upload failed)', true);
+            showToast('Stored image inline (upload failed)', true);
         }
     } else {
         const url = await fileToBase64(processedFile);
@@ -1518,11 +1593,12 @@ async function removeQuestionImage(questionId) {
     const form = getCurrentForm();
     const q = form.questions.find(q => q.id === questionId);
     if (!q || !q.image) return;
-    if (sbClient && q.image.url && !q.image.url.startsWith('data:')) {
+    if (pb && q.image.url && !q.image.url.startsWith('data:')) {
         try {
             const url = new URL(q.image.url);
-            const parts = url.pathname.split('/storage/v1/object/public/form-images/');
-            if (parts[1]) await sbClient.storage.from('form-images').remove([parts[1]]);
+            // /api/files/form_images/{recordId}/{filename}
+            const parts = url.pathname.split('/api/files/form_images/');
+            if (parts[1]) await pb.collection('form_images').delete(parts[1].split('/')[0]);
         } catch (e) {}
     }
     q.image = null;

@@ -11,7 +11,7 @@
     <title>Formure — Editor</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="editor-styles.css">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pocketbase@0.28/dist/pocketbase.umd.js"></script>
     <script src="config.js"></script>
 </head>
 <body class="editor-mode">
@@ -47,6 +47,7 @@
         </div>
         <div class="nav-actions">
             <span class="nav-user" id="navUser"></span>
+            <button class="btn btn-secondary" id="aiFormBtn" title="Generate a form from a brief with AI">✨ Generate</button>
             <button class="btn btn-secondary" id="previewBtn">Preview</button>
             <button class="btn btn-secondary" id="shareBtn">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -144,6 +145,22 @@
             <div class="modal-actions">
                 <button class="btn btn-secondary" id="cancelNewForm">Cancel</button>
                 <button class="btn btn-primary" id="confirmNewForm">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="aiGenerateModal">
+        <div class="modal-content">
+            <h2 class="modal-title">✨ Generate Form with AI</h2>
+            <p class="modal-message" style="margin-bottom:12px">Paste your brief — questionnaire doc, bullet points, notes, a ChatGPT answer — and our AI structures it into a Formure form. You can edit everything after.</p>
+            <div class="form-group">
+                <label>Brief</label>
+                <textarea id="aiBrief" rows="9" placeholder="Paste here... (any language)" style="width:100%;resize:vertical;font-family:inherit"></textarea>
+            </div>
+            <p class="auth-error" id="aiError" style="display:none"></p>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelAiGenerate">Cancel</button>
+                <button class="btn btn-primary" id="confirmAiGenerate">Generate</button>
             </div>
         </div>
     </div>
