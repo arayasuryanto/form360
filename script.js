@@ -58,18 +58,22 @@ async function init() {
     questionHintEl = document.querySelector('.question-hint');
 
     if (useBackend && formId && isValidFormId(formId)) {
-        try {
-            const formData = await getFormFromBackend(formId);
-            if (formData) {
-                currentFormId = formData.id;
-                questions = formData.questions || [];
-                formConfig = {
-                    welcome: { title: formData.welcome_title || formConfig.welcome.title, subtitle: formData.welcome_subtitle || formConfig.welcome.subtitle },
-                    results: { title: formData.results_title || formConfig.results.title, subtitle: formData.results_subtitle || formConfig.results.subtitle, buttonText: formData.results_button_text || formConfig.results.buttonText }
-                };
-            }
-        } catch (e) {
-            // Silent — falls through to error screen below
+        const result = await getFormFromBackend(formId);
+        if (result.kind === 'ok' && result.data) {
+            const formData = result.data;
+            currentFormId = formData.id;
+            questions = formData.questions || [];
+            formConfig = {
+                welcome: { title: formData.welcome_title || formConfig.welcome.title, subtitle: formData.welcome_subtitle || formConfig.welcome.subtitle },
+                results: { title: formData.results_title || formConfig.results.title, subtitle: formData.results_subtitle || formConfig.results.subtitle, buttonText: formData.results_button_text || formConfig.results.buttonText }
+            };
+        } else if (result.kind === 'network') {
+            showViewerError(
+                'Connection problem',
+                'Could not reach the server. Check your internet connection, then try again.',
+                true
+            );
+            return;
         }
     }
 
@@ -99,10 +103,7 @@ async function init() {
             window.location.href = '/';
             return;
         }
-        document.getElementById('welcomeTitle').textContent = 'Form Not Found';
-        document.getElementById('welcomeSubtitle').textContent = 'This form is not available. Make sure the link is correct.';
-        const startBtnElement = document.getElementById('startBtn');
-        if (startBtnElement) startBtnElement.style.display = 'none';
+        showViewerError('Form Not Found', 'This form is not available. Make sure the link is correct.', false);
         return;
     }
 
@@ -132,32 +133,49 @@ function decodeFormParam(param) {
 }
 
 async function getFormFromBackend(formId) {
-    if (!pb) return null;
+    if (!pb) return { kind: 'notfound', data: null };
+
+    // One automatic retry — mobile networks hiccup and a single dropped request
+    // should never read as "form not found".
+    const attempt = async (fn) => {
+        let lastErr;
+        for (let i = 0; i < 2; i++) {
+            try { return await fn(); } catch (e) { lastErr = e; }
+        }
+        throw lastErr;
+    };
+
     let data = null;
     try {
-        data = await pb.collection('forms').getOne(formId);
-    } catch (e) {}
+        data = await attempt(() => pb.collection('forms').getOne(formId));
+    } catch (e) {
+        if (!e || e.status !== 404) return { kind: 'network', data: null };
+    }
     if (!data) {
         // Short share slug (/f/<slug>) — resolve by slug field.
         try {
-            const list = await pb.collection('forms').getList(1, 1, {
+            const list = await attempt(() => pb.collection('forms').getList(1, 1, {
                 filter: pb.filter('slug = {:s}', { s: formId })
-            });
+            }));
             data = (list.items && list.items[0]) || null;
-        } catch (e) {}
+        } catch (e) {
+            return { kind: 'network', data: null };
+        }
     }
-    if (!data) return null;
+    if (!data) return { kind: 'notfound', data: null };
 
     let questionsData = [];
     try {
-        questionsData = await pb.collection('questions').getFullList({
+        questionsData = await attempt(() => pb.collection('questions').getFullList({
             filter: pb.filter('form_id = {:formId}', { formId: data.id }),
             sort: 'question_order'
-        });
-    } catch (e) {}
+        }));
+    } catch (e) {
+        return { kind: 'network', data: null };
+    }
 
     data.questions = questionsData.map(normalizeQuestion);
-    return data;
+    return { kind: 'ok', data };
 }
 
 function normalizeQuestion(q) {
@@ -253,6 +271,25 @@ function initWelcomeScreen() {
             if (i > 0) subEl.appendChild(document.createElement('br'));
             subEl.appendChild(document.createTextNode(line));
         });
+    }
+}
+
+// Error screen on the start card: retry=true adds a reload button (network problems
+// must never be presented as "form not found").
+function showViewerError(title, subtitle, retry) {
+    const titleEl = document.getElementById('welcomeTitle');
+    const subEl = document.getElementById('welcomeSubtitle');
+    if (titleEl) titleEl.textContent = title;
+    if (subEl) subEl.textContent = subtitle;
+    const startBtnElement = document.getElementById('startBtn');
+    if (startBtnElement) startBtnElement.style.display = retry ? '' : 'none';
+    if (retry && startBtnElement) {
+        startBtnElement.textContent = 'Try again';
+        startBtnElement.disabled = false;
+        startBtnElement.style.opacity = '1';
+        startBtnElement.replaceWith(startBtnElement.cloneNode(true));
+        const fresh = document.getElementById('startBtn');
+        fresh.addEventListener('click', () => window.location.reload());
     }
 }
 
@@ -684,7 +721,13 @@ async function showResults() {
     const answersArray = Object.entries(answers).map(([questionId, answer]) => ({ questionId, answer }));
 
     if (useBackend) {
-        await saveResponseToBackend(timeTaken, answersArray);
+        const saved = await saveResponseToBackend(timeTaken, answersArray);
+        if (!saved) {
+            // Never show "Thank You" on a failed save — the respondent's answers
+            // are still in memory; offer a retry instead of losing them silently.
+            showSaveFailedScreen(timeTaken, answersArray);
+            return;
+        }
     }
 
     dynamicStepper.replaceChildren();
@@ -720,6 +763,32 @@ async function showResults() {
     restartBtn.textContent = formConfig.results.buttonText || 'Try Again';
 
     createConfetti();
+    isTransitioning = false;
+}
+
+// Shown when submitting answers failed (network): keep answers in memory and retry.
+function showSaveFailedScreen(timeTaken, answersArray) {
+    questionScreen.style.display = 'none';
+    document.getElementById('bottomNav').style.display = 'none';
+    document.body.classList.remove('nav-visible');
+    resultsScreen.style.display = 'flex';
+    document.getElementById('resultsTitle').textContent = 'Connection problem';
+    const sub = document.getElementById('resultsSubtitle');
+    sub.textContent = 'Your answers were not saved yet. Check your connection and press Try Again.';
+    restartBtn.textContent = 'Try Again';
+    restartBtn.replaceWith(restartBtn.cloneNode(true));
+    const fresh = document.getElementById('restartBtn');
+    fresh.addEventListener('click', async () => {
+        fresh.disabled = true;
+        fresh.textContent = 'Saving…';
+        const ok = await saveResponseToBackend(timeTaken, answersArray);
+        if (ok) {
+            window.location.reload();
+        } else {
+            fresh.disabled = false;
+            fresh.textContent = 'Try Again';
+        }
+    });
     isTransitioning = false;
 }
 
