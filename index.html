@@ -42,28 +42,28 @@
 
     <!-- Top Navigation -->
     <nav class="top-nav" id="topNav" style="display:none">
-        <div class="logo">
-            <img src="formure-logo.png" alt="Formure" height="28" style="border-radius:6px;object-fit:contain">
+        <div class="nav-left">
+            <button class="icon-btn nav-burger" id="sidebarToggle" title="Toggle form list">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+                </svg>
+            </button>
+            <div class="logo">
+                <img src="formure-logo.png" alt="Formure" height="28" style="border-radius:6px;object-fit:contain">
+                <span>Formure</span>
+            </div>
         </div>
         <div class="nav-actions">
             <span class="nav-user" id="navUser"></span>
-            <button class="btn btn-secondary" id="aiFormBtn" title="Generate a form from a brief with AI">✨ Generate</button>
-            <button class="btn btn-secondary" id="previewBtn">Preview</button>
-            <button class="btn btn-secondary" id="shareBtn">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-                </svg>
-                Share
-            </button>
-            <button class="btn btn-primary" id="saveBtn">Save</button>
-            <button class="btn btn-ghost" id="signOutBtn" title="Sign out">Sign out</button>
+            <button class="btn btn-secondary nav-settings-toggle" id="settingsToggle" title="Form settings">⚙<span class="btn-label"> Settings</span></button>
+            <button class="btn btn-secondary" id="aiFormBtn" title="Generate a form from a brief with AI">✨<span class="btn-label"> Generate</span></button>
+            <button class="btn btn-ghost" id="signOutBtn" title="Sign out"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span class="btn-label"> Sign out</span></button>
         </div>
     </nav>
 
     <!-- Main Container -->
     <main class="editor-container" id="editorContainer" style="display:none">
-        <!-- Sidebar -->
+        <!-- Sidebar: form list, collapsible -->
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <h2>My Forms</h2>
@@ -72,32 +72,8 @@
             <div class="form-list" id="formList"></div>
         </aside>
 
-        <!-- Editor Panel -->
+        <!-- Center: the question canvas -->
         <div class="editor-panel" id="editorPanel">
-            <div class="editor-section" id="formSettings">
-                <h3 class="section-title">Form Settings</h3>
-                <div class="form-group">
-                    <label>Form Name</label>
-                    <input type="text" id="formName" placeholder="Enter form name">
-                </div>
-                <div class="form-group">
-                    <label>Description</label>
-                    <textarea id="formDescription" placeholder="Form description (optional)" rows="2"></textarea>
-                </div>
-            </div>
-
-            <div class="editor-section" id="welcomeEditor">
-                <h3 class="section-title">Welcome Screen</h3>
-                <div class="form-group">
-                    <label>Title</label>
-                    <input type="text" id="welcomeTitle" placeholder="Hello, Welcome!">
-                </div>
-                <div class="form-group">
-                    <label>Subtitle</label>
-                    <textarea id="welcomeSubtitle" placeholder="Press Start or Enter to begin" rows="2"></textarea>
-                </div>
-            </div>
-
             <div class="editor-section" id="questionsEditor">
                 <h3 class="section-title">Questions</h3>
                 <div class="questions-list" id="questionsList"></div>
@@ -108,24 +84,70 @@
                     Add Question
                 </button>
             </div>
+        </div>
 
-            <div class="editor-section" id="resultsEditor">
-                <h3 class="section-title">Results Screen</h3>
-                <div class="form-group">
-                    <label>Title</label>
-                    <input type="text" id="resultsTitle" placeholder="Thank You!">
+        <!-- Right: configuration -->
+        <aside class="settings-panel" id="settingsPanel">
+            <div class="settings-head">
+                <h3>Settings</h3>
+                <button class="modal-close settings-close" id="settingsClose">&times;</button>
+            </div>
+            <div class="settings-body">
+                <div class="editor-section" id="formSettings">
+                    <h3 class="section-title">Form Settings</h3>
+                    <div class="form-group">
+                        <label>Form Name</label>
+                        <input type="text" id="formName" placeholder="Enter form name">
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="formDescription" placeholder="Form description (optional)" rows="2"></textarea>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>Subtitle</label>
-                    <input type="text" id="resultsSubtitle" placeholder="You have completed this form">
+
+                <div class="editor-section" id="welcomeEditor">
+                    <h3 class="section-title">Welcome Screen</h3>
+                    <div class="form-group">
+                        <label>Title</label>
+                        <input type="text" id="welcomeTitle" placeholder="Hello, Welcome!">
+                    </div>
+                    <div class="form-group">
+                        <label>Subtitle</label>
+                        <textarea id="welcomeSubtitle" placeholder="Press Start or Enter to begin" rows="2"></textarea>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>Retry Button</label>
-                    <input type="text" id="resultsButtonText" placeholder="Try Again">
+
+                <div class="editor-section" id="resultsEditor">
+                    <h3 class="section-title">Results Screen</h3>
+                    <div class="form-group">
+                        <label>Title</label>
+                        <input type="text" id="resultsTitle" placeholder="Thank You!">
+                    </div>
+                    <div class="form-group">
+                        <label>Subtitle</label>
+                        <input type="text" id="resultsSubtitle" placeholder="You have completed this form">
+                    </div>
+                    <div class="form-group">
+                        <label>Retry Button</label>
+                        <input type="text" id="resultsButtonText" placeholder="Try Again">
+                    </div>
                 </div>
             </div>
-        </div>
+            <div class="settings-actions">
+                <button class="btn btn-secondary" id="previewBtn">Preview</button>
+                <button class="btn btn-secondary" id="shareBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                    </svg>
+                    Share
+                </button>
+                <button class="btn btn-primary" id="saveBtn">Save</button>
+            </div>
+        </aside>
     </main>
+
+    <div class="drawer-backdrop" id="drawerBackdrop" style="display:none"></div>
 
     <!-- Modals -->
     <div class="modal" id="previewModal">

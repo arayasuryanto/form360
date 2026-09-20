@@ -134,6 +134,7 @@ async function enterEditor() {
     if (userBadge && currentUser) userBadge.textContent = currentUser.email || '';
 
     setupEventListeners();
+    setupLayoutToggles();
     try {
         await loadForms();
     } catch (e) {
@@ -285,6 +286,90 @@ function generateShareSlug(length = 7) {
 function bind(id, event, fn) {
     const el = document.getElementById(id);
     if (el) el.addEventListener(event, fn);
+}
+
+function setupLayoutToggles() {
+    const container = document.getElementById('editorContainer');
+    const sidebar = document.getElementById('sidebar');
+    const settings = document.getElementById('settingsPanel');
+    const backdrop = document.getElementById('drawerBackdrop');
+    if (!container || !sidebar || !settings) return;
+
+    const isNarrow = () => window.matchMedia('(max-width: 960px)').matches;
+
+    const refreshBackdrop = () => {
+        const anyDrawer = isNarrow() && (sidebarOpen || settingsOpen);
+        backdrop.style.display = anyDrawer ? '' : 'none';
+    };
+    let sidebarOpen = true;   // desktop default; on mobile it starts closed
+    let settingsOpen = false;
+
+    // Restore desktop sidebar state
+    if (localStorage.getItem('formure_sidebar') === 'collapsed') {
+        container.classList.add('sidebar-collapsed');
+        sidebarOpen = false;
+    }
+
+    document.getElementById('sidebarToggle').addEventListener('click', () => {
+        if (isNarrow()) {
+            // On mobile the sidebar is a drawer: backdrop + close-on-outside
+            sidebarOpen = !sidebarOpen;
+            container.classList.toggle('sidebar-collapsed', !sidebarOpen);
+            settingsOpen = false;
+            settings.classList.remove('open');
+        } else {
+            sidebarOpen = !sidebarOpen;
+            container.classList.toggle('sidebar-collapsed', !sidebarOpen);
+            localStorage.setItem('formure_sidebar', sidebarOpen ? 'open' : 'collapsed');
+        }
+        refreshBackdrop();
+    });
+
+    const st = document.getElementById('settingsToggle');
+    if (st) st.addEventListener('click', () => {
+        if (isNarrow()) {
+            settingsOpen = !settingsOpen;
+            settings.classList.toggle('open', settingsOpen);
+            sidebarOpen = false;
+            container.classList.add('sidebar-collapsed');
+            refreshBackdrop();
+        }
+    });
+
+    const sc = document.getElementById('settingsClose');
+    if (sc) sc.addEventListener('click', () => {
+        settingsOpen = false;
+        settings.classList.remove('open');
+        refreshBackdrop();
+    });
+
+    if (backdrop) backdrop.addEventListener('click', () => {
+        settingsOpen = false;
+        settings.classList.remove('open');
+        sidebarOpen = false;
+        container.classList.add('sidebar-collapsed');
+        refreshBackdrop();
+    });
+
+    // Resize: leaving mobile closes drawers, desktop sidebar state restored
+    window.addEventListener('resize', () => {
+        if (!isNarrow()) {
+            settingsOpen = false;
+            settings.classList.remove('open');
+            sidebarOpen = localStorage.getItem('formure_sidebar') !== 'collapsed';
+            container.classList.toggle('sidebar-collapsed', !sidebarOpen);
+        } else {
+            sidebarOpen = false;
+            container.classList.add('sidebar-collapsed');
+        }
+        refreshBackdrop();
+    });
+
+    if (isNarrow()) {
+        sidebarOpen = false;
+        container.classList.add('sidebar-collapsed');
+    }
+    refreshBackdrop();
 }
 
 function setupEventListeners() {
