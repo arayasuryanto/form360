@@ -551,8 +551,23 @@ function loadQuestion(idx) {
 
     setTimeout(() => {
         optionsList.replaceChildren();
-        const useGrid = (q.options || []).length > 4;
-        optionsList.classList.toggle('grid-mode', useGrid && (q.type === 'multiple_choice' || q.type === 'checkbox'));
+        // Adaptive option layout: everything must fit the screen — no hidden scroll,
+        // no text bleeding out of boxes. Short labels → 2-col grid; long labels on a
+        // phone → single-column compact rows; roomy screens keep the big cards.
+        const isNarrow = window.matchMedia('(max-width: 700px)').matches;
+        const opts = q.options || [];
+        const optCount = opts.length;
+        const maxLabelLen = opts.length ? Math.max(...opts.map(o => (o.text || '').length)) : 0;
+        const longLabels = maxLabelLen > (isNarrow ? 16 : 30);
+        let mode = 'cards';
+        if (q.type === 'multiple_choice' || q.type === 'checkbox') {
+            if (optCount > 4) mode = (isNarrow && longLabels) ? 'list' : 'grid';
+            else if (isNarrow) mode = longLabels ? 'list' : 'grid';
+        }
+        const compact = mode !== 'cards';
+        optionsList.classList.toggle('grid-mode', mode === 'grid');
+        optionsList.classList.toggle('list-mode', mode === 'list');
+        const btnClass = extra => 'option-btn ' + extra + (compact ? (mode === 'list' ? ' list-compact' : ' compact') : '');
 
         if (q.type === 'section') {
             setContinueEnabled(true);
@@ -608,7 +623,7 @@ function loadQuestion(idx) {
             const labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
             (q.options || []).forEach((opt, i) => {
                 const btn = document.createElement('button');
-                btn.className = 'option-btn checkbox-btn' + (useGrid ? ' compact' : '');
+                btn.className = btnClass('checkbox-btn');
                 btn.dataset.key = labels[i];
                 btn.dataset.value = opt.value;
                 btn.innerHTML = `
@@ -650,7 +665,7 @@ function loadQuestion(idx) {
             const labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
             (q.options || []).forEach((opt, i) => {
                 const btn = document.createElement('button');
-                btn.className = 'option-btn' + (useGrid ? ' compact' : '');
+                btn.className = btnClass('');
                 btn.dataset.key = labels[i];
                 btn.dataset.value = opt.value;
                 const key = document.createElement('span');

@@ -351,7 +351,7 @@ body.nav-visible .main-container {
     scroll-behavior: smooth;
 }
 
-/* Many options (5+): compact grid that fits the screen — no hidden-below-the-fold options */
+/* Many options: compact grid that fits the screen — no hidden-below-the-fold options */
 .options-list.grid-mode {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -363,21 +363,59 @@ body.nav-visible .main-container {
     align-items: stretch;
 }
 
+/* Long labels on phones: single-column compact rows — text never bleeds, always tappable */
+.options-list.list-mode {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    max-height: none;
+    overflow-y: visible;
+    min-height: 0;
+    padding-right: 0;
+}
+
 .option-btn.compact {
     padding: 11px 13px;
     gap: 10px;
     border-radius: 10px;
     min-height: 46px;
     animation-delay: 0.15s !important;
+    align-items: flex-start;
 }
 
 .option-btn.compact .option-text {
     font-size: 0.86rem;
-    line-height: 1.35;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-width: 0;
 }
 
 .option-btn.compact .option-key {
     flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    font-size: 0.72rem;
+    margin-top: 1px;
+}
+
+.option-btn.list-compact {
+    padding: 10px 12px;
+    min-height: 44px;
+}
+
+.option-btn.list-compact .option-text {
+    font-size: 0.85rem;
+}
+
+/* Short screens: tighten rows so 11-12 options still fit without any scroll */
+@media (max-height: 720px) {
+    .option-btn.list-compact { padding: 7px 10px; min-height: 36px; }
+    .option-btn.list-compact .option-text { font-size: 0.78rem; }
+    .option-btn.compact { padding: 8px 10px; min-height: 38px; }
+    .option-btn.compact .option-text { font-size: 0.78rem; }
 }
 
 .options-list::-webkit-scrollbar {
@@ -834,6 +872,35 @@ body.nav-visible .main-container {
     .option-btn.compact .option-text {
         font-size: 0.78rem;
     }
+
+    /* On phones the bottom Next bar is the primary control — the in-card
+       Continue button only steals vertical space. The hint line ("Choose one")
+       is redundant there too — every px goes to fitting the options. */
+    #continueBtn { display: none !important; }
+    .question-hint { display: none; margin-bottom: 0; }
+    #questionScreen .question-card { padding: 24px 20px; max-height: none; }
+    #questionScreen .question-text { margin-bottom: 14px; }
+    #questionScreen .options-list { margin-bottom: 14px; }
+
+    /* Stacked full cards can push the last option behind a fold — compact them. */
+    .options-list:not(.grid-mode):not(.list-mode) {
+        gap: 8px;
+    }
+    .options-list:not(.grid-mode):not(.list-mode) .option-btn {
+        padding: 12px 14px;
+    }
+
+    /* If a label-heavy list can't physically fit, let the PAGE scroll — the
+       respondent sees the list continue below the fold (discoverable), the
+       Back/Next bar stays fixed, and padding keeps every option clear of the
+       top nav and bottom bar. Never a hidden inner scroll box. */
+    #questionScreen.main-container {
+        align-items: flex-start;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 78px 16px 104px;
+    }
+    .option-btn.list-compact { padding: 9px 12px; min-height: 40px; }
 
     .results-summary {
         padding: 32px 24px;
