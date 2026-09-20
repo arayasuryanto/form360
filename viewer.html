@@ -64,22 +64,22 @@
         </div>
     </main>
 
-    <!-- Bottom Navigation -->
+    <!-- Bottom Navigation: Back / progress / Next -->
     <div class="bottom-nav" id="bottomNav" style="display: none;">
         <div class="scroll-indicator">
+            <button class="nav-btn" id="backBtn" disabled>
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Back
+            </button>
             <span id="progressText">1/5</span>
-            <div class="scroll-arrows">
-                <button class="scroll-btn" id="scrollUp" disabled>
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M12 10L8 6l-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </button>
-                <button class="scroll-btn" id="scrollDown">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </button>
-            </div>
+            <button class="nav-btn next-btn" id="nextBtn" disabled>
+                Next
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
         </div>
     </div>
 

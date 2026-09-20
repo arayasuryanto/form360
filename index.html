@@ -214,31 +214,41 @@
         </div>
     </div>
 
-    <div class="modal" id="respondentsModal">
-        <div class="modal-content respondents-modal-content">
-            <div class="respondents-header">
-                <h2 class="modal-title" id="respondentsFormName">Respondents</h2>
-                <button class="modal-close" id="closeRespondents">&times;</button>
+    <!-- Respondents — full page (was a modal) -->
+    <section class="responses-page" id="responsesPage" style="display:none;">
+        <header class="responses-header">
+            <button class="btn btn-ghost" id="closeRespondents">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Back to editor
+            </button>
+            <div class="responses-title">
+                <h2 id="respondentsFormName">Respondents</h2>
+                <span class="responses-meta" id="responsesMeta"></span>
             </div>
-            <div class="respondents-body">
-                <div class="respondents-list" id="respondentsList"></div>
-                <div class="respondent-detail" id="respondentDetail" style="display:none">
-                    <div class="detail-header" id="respondentDetailHeader"></div>
-                    <div class="detail-charts">
-                        <div class="chart-card">
-                            <h4>Answer Distribution</h4>
-                            <canvas id="answerPieChart" width="160" height="160"></canvas>
-                        </div>
-                        <div class="chart-card">
-                            <h4>Completion Time</h4>
-                            <div class="time-stats" id="timeStats"></div>
-                        </div>
+            <button class="btn btn-secondary" id="responsesExportBtn" title="Download all responses as Excel">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Excel
+            </button>
+        </header>
+        <div class="responses-stats" id="responsesStats"></div>
+        <div class="respondents-body">
+            <div class="respondents-list" id="respondentsList"></div>
+            <div class="respondent-detail" id="respondentDetail" style="display:none">
+                <div class="detail-header" id="respondentDetailHeader"></div>
+                <div class="detail-charts">
+                    <div class="chart-card">
+                        <h4>Answer Distribution</h4>
+                        <canvas id="answerPieChart" width="160" height="160"></canvas>
                     </div>
-                    <div class="detail-answers" id="respondentAnswers"></div>
+                    <div class="chart-card">
+                        <h4>Completion Time</h4>
+                        <div class="time-stats" id="timeStats"></div>
+                    </div>
                 </div>
+                <div class="detail-answers" id="respondentAnswers"></div>
             </div>
         </div>
-    </div>
+    </section>
 
     <div class="modal" id="shareModal">
         <div class="modal-content">

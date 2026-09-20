@@ -25,7 +25,7 @@ let pb = null;
 
 let dynamicStepper, startScreen, questionScreen, resultsScreen;
 let startBtn, continueBtn, restartBtn;
-let scrollUpBtn, scrollDownBtn, progressText;
+let backBtn, nextBtn, progressText;
 let optionsList, questionNumberEl, questionTextEl, questionHintEl;
 
 document.addEventListener('DOMContentLoaded', init);
@@ -49,8 +49,8 @@ async function init() {
     startBtn = document.getElementById('startBtn');
     continueBtn = document.getElementById('continueBtn');
     restartBtn = document.getElementById('restartBtn');
-    scrollUpBtn = document.getElementById('scrollUp');
-    scrollDownBtn = document.getElementById('scrollDown');
+    backBtn = document.getElementById('backBtn');
+    nextBtn = document.getElementById('nextBtn');
     progressText = document.getElementById('progressText');
     optionsList = document.querySelector('.options-list');
     questionNumberEl = document.querySelector('.q-number');
@@ -111,8 +111,8 @@ async function init() {
     optionsList.addEventListener('click', handleOptionClick);
     continueBtn.addEventListener('click', handleContinue);
     restartBtn.addEventListener('click', restartForm);
-    scrollUpBtn.addEventListener('click', () => navigate(-1));
-    scrollDownBtn.addEventListener('click', () => navigate(1));
+    backBtn.addEventListener('click', () => navigate(-1));
+    nextBtn.addEventListener('click', handleContinue);
 
     initWelcomeScreen();
     updateStepper();
@@ -133,15 +133,25 @@ function decodeFormParam(param) {
 
 async function getFormFromBackend(formId) {
     if (!pb) return null;
-    let data;
+    let data = null;
     try {
         data = await pb.collection('forms').getOne(formId);
-    } catch (e) { return null; }
+    } catch (e) {}
+    if (!data) {
+        // Short share slug (/f/<slug>) — resolve by slug field.
+        try {
+            const list = await pb.collection('forms').getList(1, 1, {
+                filter: pb.filter('slug = {:s}', { s: formId })
+            });
+            data = (list.items && list.items[0]) || null;
+        } catch (e) {}
+    }
+    if (!data) return null;
 
     let questionsData = [];
     try {
         questionsData = await pb.collection('questions').getFullList({
-            filter: pb.filter('form_id = {:formId}', { formId }),
+            filter: pb.filter('form_id = {:formId}', { formId: data.id }),
             sort: 'question_order'
         });
     } catch (e) {}
@@ -200,22 +210,36 @@ async function saveResponseToBackend(timeTaken, answersArray) {
             time_taken: timeTaken
         });
 
-        for (const a of answersArray) {
-            await pb.collection('answers').create({
-                response_id: response.id,
-                question_id: a.questionId,
-                answer_value: a.answer
-            });
+        // Prefer an atomic batch so a respondent's answers are saved all-or-nothing.
+        if (typeof pb.batch === 'function') {
+            const batch = pb.batch();
+            for (const a of answersArray) {
+                batch.collection('answers').create({
+                    response_id: response.id,
+                    question_id: a.questionId,
+                    answer_value: a.answer
+                });
+            }
+            await batch.send();
+        } else {
+            for (const a of answersArray) {
+                await pb.collection('answers').create({
+                    response_id: response.id,
+                    question_id: a.questionId,
+                    answer_value: a.answer
+                });
+            }
         }
         return true;
     } catch (e) {
+        console.error('saveResponseToBackend failed:', e);
         return false;
     }
 }
 
 function isValidFormId(str) {
-    // PocketBase record ids: 15-char alphanumeric.
-    return /^[a-zA-Z0-9]{15}$/.test(str);
+    // PocketBase record ids (15 chars) or short share slugs (7 chars).
+    return /^[a-zA-Z0-9]{5,15}$/.test(str);
 }
 
 function initWelcomeScreen() {
@@ -305,6 +329,12 @@ function saveCurrentAnswer() {
     }
 }
 
+function setContinueEnabled(on) {
+    continueBtn.disabled = !on;
+    continueBtn.style.opacity = on ? '1' : '0.5';
+    if (nextBtn) nextBtn.disabled = !on;
+}
+
 function startForm() {
     if (isTransitioning) return;
     isTransitioning = true;
@@ -314,6 +344,7 @@ function startForm() {
         startScreen.style.display = 'none';
         questionScreen.style.display = 'flex';
         document.getElementById('bottomNav').style.display = 'flex';
+        document.body.classList.add('nav-visible');
         updateStepper();
         loadQuestion(0);
         setTimeout(() => { isTransitioning = false; }, 300);
@@ -371,15 +402,12 @@ function handleOptionClick(e) {
             btn.classList.add('selected');
             selectedAnswers.push(val);
         }
-        const has = selectedAnswers.length > 0;
-        continueBtn.disabled = !has;
-        continueBtn.style.opacity = has ? '1' : '0.5';
+        setContinueEnabled(selectedAnswers.length > 0);
     } else {
         optionsList.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
         selectedAnswer = btn.dataset.value;
-        continueBtn.disabled = false;
-        continueBtn.style.opacity = '1';
+        setContinueEnabled(true);
     }
 }
 
@@ -389,8 +417,7 @@ function selectOptionByIndex(idx) {
         btns.forEach(b => b.classList.remove('selected'));
         btns[idx].classList.add('selected');
         selectedAnswer = btns[idx].dataset.value;
-        continueBtn.disabled = false;
-        continueBtn.style.opacity = '1';
+        setContinueEnabled(true);
     }
 }
 
@@ -405,9 +432,7 @@ function toggleOptionByIndex(idx) {
         btns[idx].classList.add('selected');
         selectedAnswers.push(val);
     }
-    const has = selectedAnswers.length > 0;
-    continueBtn.disabled = !has;
-    continueBtn.style.opacity = has ? '1' : '0.5';
+    setContinueEnabled(selectedAnswers.length > 0);
 }
 
 function handleContinue() {
@@ -457,8 +482,14 @@ function loadQuestion(idx) {
 
     questionNumberEl.textContent = idx + 1;
     progressText.textContent = `${idx + 1}/${questions.length}`;
-    scrollUpBtn.disabled = idx === 0;
-    scrollDownBtn.disabled = idx === questions.length - 1;
+    if (backBtn) backBtn.disabled = idx === 0;
+    if (nextBtn) {
+        nextBtn.disabled = true;
+        const isLast = idx === questions.length - 1;
+        nextBtn.innerHTML = isLast
+            ? 'Finish <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2.5 8.5l3.5 3.5 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+            : 'Next <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    }
     updateStepper();
 
     questionTextEl.classList.add('changing');
@@ -483,8 +514,11 @@ function loadQuestion(idx) {
 
     setTimeout(() => {
         optionsList.replaceChildren();
+        const useGrid = (q.options || []).length > 4;
+        optionsList.classList.toggle('grid-mode', useGrid && (q.type === 'multiple_choice' || q.type === 'checkbox'));
 
         if (q.type === 'section') {
+            setContinueEnabled(true);
             const screen = document.createElement('div');
             screen.className = 'section-screen';
             if (q.color) screen.style.borderTop = `3px solid ${q.color}`;
@@ -519,8 +553,7 @@ function loadQuestion(idx) {
             textValue = ta.value;
             ta.addEventListener('input', e => {
                 textValue = e.target.value;
-                continueBtn.disabled = !textValue.trim();
-                continueBtn.style.opacity = textValue.trim() ? '1' : '0.5';
+                setContinueEnabled(!!textValue.trim());
             });
             ta.addEventListener('keydown', e => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -529,8 +562,7 @@ function loadQuestion(idx) {
                 }
             });
             if (textValue.trim()) {
-                continueBtn.disabled = false;
-                continueBtn.style.opacity = '1';
+                setContinueEnabled(true);
             }
             setTimeout(() => ta.focus(), 100);
         } else if (q.type === 'checkbox') {
@@ -539,7 +571,7 @@ function loadQuestion(idx) {
             const labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
             (q.options || []).forEach((opt, i) => {
                 const btn = document.createElement('button');
-                btn.className = 'option-btn checkbox-btn';
+                btn.className = 'option-btn checkbox-btn' + (useGrid ? ' compact' : '');
                 btn.dataset.key = labels[i];
                 btn.dataset.value = opt.value;
                 btn.innerHTML = `
@@ -571,11 +603,9 @@ function loadQuestion(idx) {
                         selectedAnswers.push(val);
                     }
                 });
-                continueBtn.disabled = false;
-                continueBtn.style.opacity = '1';
+                setContinueEnabled(true);
             } else {
-                continueBtn.disabled = true;
-                continueBtn.style.opacity = '0.5';
+                setContinueEnabled(false);
             }
             selectedAnswer = null;
         } else {
@@ -583,7 +613,7 @@ function loadQuestion(idx) {
             const labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
             (q.options || []).forEach((opt, i) => {
                 const btn = document.createElement('button');
-                btn.className = 'option-btn';
+                btn.className = 'option-btn' + (useGrid ? ' compact' : '');
                 btn.dataset.key = labels[i];
                 btn.dataset.value = opt.value;
                 const key = document.createElement('span');
@@ -601,8 +631,7 @@ function loadQuestion(idx) {
                 if (savedBtn) {
                     savedBtn.classList.add('selected');
                     selectedAnswer = answers[q.id];
-                    continueBtn.disabled = false;
-                    continueBtn.style.opacity = '1';
+                    setContinueEnabled(true);
                 }
             } else {
                 selectedAnswer = null;
@@ -683,6 +712,7 @@ async function showResults() {
 
     questionScreen.style.display = 'none';
     document.getElementById('bottomNav').style.display = 'none';
+    document.body.classList.remove('nav-visible');
     resultsScreen.style.display = 'flex';
 
     document.getElementById('resultsTitle').textContent = formConfig.results.title;

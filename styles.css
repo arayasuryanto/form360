@@ -201,6 +201,11 @@ body {
     z-index: 10;
 }
 
+/* When the Back/Next bar is visible, lift the card so nothing hides behind it */
+body.nav-visible .main-container {
+    padding-bottom: 88px;
+}
+
 .form-container {
     display: flex;
     justify-content: center;
@@ -344,6 +349,35 @@ body {
     padding-right: 8px;
     flex-shrink: 1;
     scroll-behavior: smooth;
+}
+
+/* Many options (5+): compact grid that fits the screen — no hidden-below-the-fold options */
+.options-list.grid-mode {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+    max-height: none;
+    overflow-y: visible;
+    min-height: 0;
+    padding-right: 0;
+    align-items: stretch;
+}
+
+.option-btn.compact {
+    padding: 11px 13px;
+    gap: 10px;
+    border-radius: 10px;
+    min-height: 46px;
+    animation-delay: 0.15s !important;
+}
+
+.option-btn.compact .option-text {
+    font-size: 0.86rem;
+    line-height: 1.35;
+}
+
+.option-btn.compact .option-key {
+    flex-shrink: 0;
 }
 
 .options-list::-webkit-scrollbar {
@@ -533,17 +567,59 @@ body {
 /* Bottom Navigation */
 .bottom-nav {
     position: fixed;
-    bottom: 24px;
-    right: 24px;
+    bottom: 0;
+    left: 0;
+    right: 0;
     z-index: 50;
+    display: flex;
+    justify-content: center;
+    padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+    background: linear-gradient(to top, var(--bg) 60%, transparent);
 }
 
 .scroll-indicator {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 18px;
     color: var(--text-secondary);
-    font-size: 0.8rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: var(--white);
+    border: 1.5px solid var(--border);
+    border-radius: 999px;
+    cursor: pointer;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-weight: 600;
+    font-family: inherit;
+    transition: all 0.2s ease;
+}
+
+.nav-btn:hover:not(:disabled) {
+    border-color: var(--text-primary);
+    transform: scale(1.03);
+}
+
+.nav-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.nav-btn.next-btn {
+    background: var(--text-primary);
+    color: var(--white);
+    border-color: var(--text-primary);
+}
+
+.nav-btn.next-btn:hover:not(:disabled) {
+    background: #1a1a1a;
 }
 
 .scroll-arrows {
@@ -748,6 +824,15 @@ body {
 
     .option-btn {
         padding: 14px 16px;
+    }
+
+    .option-btn.compact {
+        padding: 9px 11px;
+        min-height: 42px;
+    }
+
+    .option-btn.compact .option-text {
+        font-size: 0.78rem;
     }
 
     .results-summary {

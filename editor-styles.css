@@ -1280,3 +1280,115 @@
     background: var(--card-bg);
     color: var(--text-primary);
 }
+/* ── Responses full page (was modal) ─────────────────────────────── */
+.responses-page {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 96px 28px 48px;
+    width: 100%;
+    animation: cardFadeIn 0.35s ease;
+}
+
+.responses-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.responses-title h2 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.responses-meta {
+    color: var(--text-muted, #8a8a8a);
+    font-size: 0.85rem;
+}
+
+.responses-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 22px;
+}
+
+.stat-card {
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border, #e8e8e8);
+    border-radius: 14px;
+    padding: 14px 18px;
+}
+
+.stat-value {
+    font-size: 1.45rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.stat-label {
+    font-size: 0.78rem;
+    color: var(--text-muted, #8a8a8a);
+    margin-top: 2px;
+}
+
+.responses-page .respondents-body {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 20px;
+    align-items: start;
+    overflow: visible;
+}
+
+.responses-page .respondents-list {
+    max-height: calc(100vh - 300px);
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.responses-page .respondent-item {
+    cursor: pointer;
+    border: 1.5px solid transparent;
+}
+
+.responses-page .respondent-item.active {
+    border-color: var(--text-primary, #2d2d2d);
+    background: var(--card-bg, #fff);
+}
+
+.responses-page .respondent-detail {
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border, #e8e8e8);
+    border-radius: 16px;
+    padding: 22px 24px;
+}
+
+.detail-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 0;
+    display: inline;
+}
+
+.detail-sub {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--text-muted, #8a8a8a);
+    margin-top: 2px;
+    word-break: break-all;
+}
+
+@media (max-width: 860px) {
+    .responses-page {
+        padding: 16px 14px 40px;
+    }
+    .responses-page .respondents-body {
+        grid-template-columns: 1fr;
+    }
+    .responses-page .respondents-list {
+        max-height: 280px;
+    }
+}

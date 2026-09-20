@@ -28,7 +28,7 @@ const previewModal = document.getElementById('previewModal');
 const newFormModal = document.getElementById('newFormModal');
 const deleteModal = document.getElementById('deleteModal');
 const previewFrame = document.getElementById('previewFrame');
-const respondentsModal = document.getElementById('respondentsModal');
+const responsesPage = document.getElementById('responsesPage');
 
 document.addEventListener('DOMContentLoaded', init);
 
@@ -173,6 +173,7 @@ async function loadForms() {
         const questions = await fetchQuestionsForForm(rf.id);
         forms.push({
             id: rf.id,
+            slug: rf.slug || null,
             name: rf.name || 'Untitled',
             description: rf.description || '',
             welcome: { title: rf.welcome_title || 'Hello, Welcome!', subtitle: rf.welcome_subtitle || 'Press Start or Enter to begin' },
@@ -269,6 +270,14 @@ function tempId() {
     return 'tmp_' + Math.random().toString(36).slice(2, 11);
 }
 
+// Short unambiguous share slug (no 0/O/1/l/I) — keeps links readable on phones.
+function generateShareSlug(length = 7) {
+    const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
+    let s = '';
+    for (let i = 0; i < length; i++) s += alphabet[Math.floor(Math.random() * alphabet.length)];
+    return s;
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // Event listeners
 // ─────────────────────────────────────────────────────────────────────
@@ -291,7 +300,7 @@ function setupEventListeners() {
     bind('cancelDelete', 'click', hideDeleteModal);
     bind('confirmDelete', 'click', confirmDelete);
     bind('closePreview', 'click', hidePreview);
-    bind('closeRespondents', 'click', hideRespondentsModal);
+    bind('closeRespondents', 'click', closeResponsesPage);
     bind('shareBtn', 'click', showShareModal);
     bind('copyLinkBtn', 'click', copyShareLink);
     bind('closeShareModal', 'click', hideShareModal);
@@ -307,7 +316,9 @@ function setupEventListeners() {
     });
 
     if (previewModal) previewModal.addEventListener('click', e => { if (e.target === previewModal) hidePreview(); });
-    if (respondentsModal) respondentsModal.addEventListener('click', e => { if (e.target === respondentsModal) hideRespondentsModal(); });
+    bind('responsesExportBtn', 'click', () => {
+        if (currentResponsesFormId) downloadFormExcel(currentResponsesFormId);
+    });
 
     if (formList) {
         formList.addEventListener('click', e => {
@@ -319,7 +330,7 @@ function setupEventListeners() {
                 if (!formItem) return;
                 const formId = formItem.dataset.formId;
                 if (btn.classList.contains('export-btn')) downloadFormExcel(formId);
-                else if (btn.classList.contains('view-btn')) showRespondentsModal(formId);
+                else if (btn.classList.contains('view-btn')) openResponsesPage(formId);
                 else if (btn.classList.contains('delete-btn')) showDeleteFormModal(formId);
                 return;
             }
@@ -602,8 +613,8 @@ async function showShareModal() {
         return;
     }
     cacheForms();
-    const baseUrl = window.location.origin + '/viewer.html';
-    document.getElementById('shareLink').value = `${baseUrl}?form=${id}`;
+    const short = form.slug || id;
+    document.getElementById('shareLink').value = `${window.location.origin}/f/${short}`;
     document.getElementById('shareModal').classList.add('active');
 }
 
@@ -640,18 +651,25 @@ function validateFormForShare(form) {
 // Respondents
 // ─────────────────────────────────────────────────────────────────────
 
-async function showRespondentsModal(formId) {
+let currentResponsesFormId = null;
+let respondentsOrderCache = [];
+
+async function openResponsesPage(formId) {
     const form = forms.find(f => f.id === formId);
     if (!form) return;
+    currentResponsesFormId = formId;
     document.getElementById('respondentsFormName').textContent = form.name;
+    document.getElementById('responsesMeta').textContent = `${form.questions.length} questions`;
+    document.getElementById('editorContainer').style.display = 'none';
     document.getElementById('respondentDetail').style.display = 'none';
-    document.getElementById('respondentsList').style.display = 'block';
-    respondentsModal.classList.add('active');
+    responsesPage.style.display = '';
 
     const respondentsList = document.getElementById('respondentsList');
     respondentsList.replaceChildren(emptyState('Loading...'));
 
     let respondents = await fetchRespondentsFromBackend(formId) || [];
+    respondentsOrderCache = respondents.map(r => r.id);
+    renderResponsesStats(form, respondents);
     respondentsList.replaceChildren();
 
     if (respondents.length === 0) {
@@ -681,9 +699,51 @@ async function showRespondentsModal(formId) {
         actions.appendChild(badge);
         actions.insertAdjacentHTML('beforeend', `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 12l4-4-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`);
         item.append(info, actions);
-        item.addEventListener('click', () => showRespondentDetail(formId, r.id));
+        item.addEventListener('click', () => {
+            respondentsList.querySelectorAll('.respondent-item.active').forEach(el => el.classList.remove('active'));
+            item.classList.add('active');
+            showRespondentDetail(formId, r.id);
+        });
         respondentsList.appendChild(item);
     });
+
+    // Auto-open the first respondent so the page never shows an empty detail pane.
+    const first = respondentsList.querySelector('.respondent-item');
+    if (first) first.click();
+}
+
+function renderResponsesStats(form, respondents) {
+    const stats = document.getElementById('responsesStats');
+    stats.replaceChildren();
+    const mk = (value, label) => {
+        const card = document.createElement('div');
+        card.className = 'stat-card';
+        const v = document.createElement('div');
+        v.className = 'stat-value';
+        v.textContent = value;
+        const l = document.createElement('div');
+        l.className = 'stat-label';
+        l.textContent = label;
+        card.append(v, l);
+        return card;
+    };
+    const total = respondents.length;
+    const times = respondents.map(r => r.time_taken).filter(t => typeof t === 'number');
+    const avg = times.length ? Math.round(times.reduce((s, t) => s + t, 0) / times.length) : null;
+    const last = respondents[0] && respondents[0].created_at ? new Date(respondents[0].created_at).toLocaleDateString() : '—';
+    const answeredAll = total === 0 ? '—' : `${Math.round((total / Math.max(1, total)) * 100)}%`;
+    stats.append(
+        mk(String(total), 'Respondents'),
+        mk(avg === null ? '—' : `${avg}s`, 'Avg. completion'),
+        mk(last, 'Latest response'),
+        mk(answeredAll, 'Completion rate')
+    );
+}
+
+function closeResponsesPage() {
+    responsesPage.style.display = 'none';
+    document.getElementById('editorContainer').style.display = '';
+    currentResponsesFormId = null;
 }
 
 function emptyState(text) {
@@ -695,25 +755,22 @@ function emptyState(text) {
     return wrap;
 }
 
-function hideRespondentsModal() {
-    respondentsModal.classList.remove('active');
-}
-
 async function showRespondentDetail(formId, respondentId) {
     const form = forms.find(f => f.id === formId);
     if (!form) return;
 
-    document.getElementById('respondentsList').style.display = 'none';
     document.getElementById('respondentDetail').style.display = 'block';
 
     const detailHeader = document.getElementById('respondentDetailHeader');
     detailHeader.replaceChildren();
-    const back = document.createElement('button');
-    back.className = 'back-btn';
-    back.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-    back.appendChild(document.createTextNode(' Back'));
-    back.addEventListener('click', () => showRespondentsModal(formId));
-    detailHeader.appendChild(back);
+    const idx = respondentsOrderCache.indexOf(respondentId);
+    const title = document.createElement('h3');
+    title.className = 'detail-title';
+    title.textContent = idx >= 0 ? `Respondent #${idx + 1}` : 'Respondent';
+    const sub = document.createElement('span');
+    sub.className = 'detail-sub';
+    sub.textContent = respondentId;
+    detailHeader.append(title, sub);
 
     const answersContainer = document.getElementById('respondentAnswers');
     answersContainer.replaceChildren();
@@ -1294,7 +1351,8 @@ async function persistFormToBackend(form) {
             results_title: form.results.title,
             results_subtitle: form.results.subtitle,
             results_button_text: form.results.buttonText,
-            is_published: true
+            is_published: true,
+            slug: form.slug || generateShareSlug()
         };
 
         let formId = form.id && !String(form.id).startsWith('tmp_') ? form.id : null;
@@ -1304,12 +1362,13 @@ async function persistFormToBackend(form) {
             const rec = await pb.collection('forms').create(formData);
             formId = rec.id;
         }
+        if (!form.slug && formData.slug) form.slug = formData.slug;
 
         // Resync questions: keep existing ids, add new ones, drop deleted ones.
         const existing = await pb.collection('questions').getFullList({
-            filter: pb.filter('form_id = {:formId}', { formId }),
-            fields: 'id'
+            filter: pb.filter('form_id = {:formId}', { formId })
         });
+        const existingById = Object.fromEntries(existing.map(q => [q.id, q]));
         const existingIds = new Set(existing.map(q => q.id));
         const keepIds = new Set(form.questions.filter(q => q.id && !String(q.id).startsWith('tmp_')).map(q => q.id));
         const toDelete = [...existingIds].filter(id => !keepIds.has(id));
@@ -1317,10 +1376,16 @@ async function persistFormToBackend(form) {
             await pb.collection('questions').delete(id);
         }
 
-        // Upsert each question with a stable order
+        // Upsert each question with a stable order — skip unchanged ones so re-saves are fast.
         const ops = form.questions.map((q, i) => buildQuestionRow(formId, q, i + 1));
         const newOps = ops.filter(op => op.isNew);
         const toUpdate = ops.filter(op => !op.isNew);
+        const rowUnchanged = (row, prev) => Object.keys(row).every(k => {
+            const a = row[k], b = prev[k];
+            if (a === null || b === null || a === undefined || b === undefined) return (a || null) === (b || null);
+            if (typeof a === 'object' || typeof b === 'object') return JSON.stringify(a) === JSON.stringify(b);
+            return String(a) === String(b);
+        });
 
         for (const op of newOps) {
             const rec = await pb.collection('questions').create(op.row);
@@ -1328,6 +1393,8 @@ async function persistFormToBackend(form) {
             if (q) q.id = rec.id;
         }
         for (const op of toUpdate) {
+            const prev = existingById[op.id];
+            if (prev && rowUnchanged(op.row, prev)) continue;
             await pb.collection('questions').update(op.id, op.row);
         }
 
