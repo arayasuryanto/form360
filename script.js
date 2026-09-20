@@ -38,7 +38,8 @@ async function init() {
 
     const urlParams = new URLSearchParams(window.location.search);
     const isPreview = urlParams.get('preview') === 'true';
-    const formId = urlParams.get('form');
+    // Form id can arrive as ?form=<id> or via the pretty /f/<id> and /s/<id> share paths.
+    const formId = urlParams.get('form') || (location.pathname.match(/^\/[fs]\/([a-zA-Z0-9]+)/) || [])[1] || null;
     const formDataParam = urlParams.get('data');
 
     dynamicStepper = document.getElementById('dynamicStepper');

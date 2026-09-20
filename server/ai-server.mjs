@@ -53,10 +53,12 @@ function send(res, status, obj) {
 }
 
 async function verifyToken(authHeader) {
-    if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
-    const token = authHeader.slice(7);
+    if (!authHeader) return null;
+    // PocketBase clients send the token raw; some clients use "Bearer <token>". Accept both.
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
     try {
         const r = await fetch(`${PB_URL}/api/collections/users/auth-refresh`, {
+            method: 'POST',
             headers: { Authorization: `Bearer ${token}` }
         });
         if (!r.ok) return null;
