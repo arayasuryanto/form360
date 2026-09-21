@@ -43,33 +43,51 @@
     <!-- Top Navigation -->
     <nav class="top-nav" id="topNav" style="display:none">
         <div class="nav-left">
-            <button class="icon-btn nav-burger" id="sidebarToggle" title="Toggle form list">
+            <button class="icon-btn nav-burger editor-only" id="sidebarToggle" title="Toggle outline">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                     <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+                </svg>
+            </button>
+            <button class="icon-btn editor-only" id="backHomeBtn" title="Back to My Forms" style="display:none">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/>
                 </svg>
             </button>
             <div class="logo">
                 <img src="formure-logo.png" alt="Formure" height="28" style="border-radius:6px;object-fit:contain">
                 <span>Formure</span>
             </div>
+            <span class="nav-form-name editor-only" id="navFormName" style="display:none"></span>
         </div>
         <div class="nav-actions">
             <span class="nav-user" id="navUser"></span>
-            <button class="btn btn-secondary nav-settings-toggle" id="settingsToggle" title="Form settings">⚙<span class="btn-label"> Settings</span></button>
-            <button class="btn btn-secondary" id="aiFormBtn" title="Generate a form from a brief with AI">✨<span class="btn-label"> Generate</span></button>
+            <button class="btn btn-secondary nav-settings-toggle editor-only" id="settingsToggle" title="Form settings" style="display:none">⚙<span class="btn-label"> Settings</span></button>
             <button class="btn btn-ghost" id="signOutBtn" title="Sign out"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span class="btn-label"> Sign out</span></button>
         </div>
     </nav>
 
-    <!-- Main Container -->
+    <!-- Home: dashboard of forms -->
+    <section class="home-view" id="homeView" style="display:none">
+        <div class="home-inner">
+            <header class="home-header">
+                <div>
+                    <h1>My Forms</h1>
+                    <p class="home-sub" id="homeSubtitle"></p>
+                </div>
+                <button class="btn btn-primary" id="newFormBtn">+ New Form</button>
+            </header>
+            <div class="form-list home-grid" id="formList"></div>
+        </div>
+    </section>
+
+    <!-- Main Container: the form editor -->
     <main class="editor-container" id="editorContainer" style="display:none">
-        <!-- Sidebar: form list, collapsible -->
+        <!-- Sidebar: outline of the current form, collapsible -->
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <h2>My Forms</h2>
-                <button class="btn btn-primary" id="newFormBtn">+ New Form</button>
+                <h2>Outline</h2>
             </div>
-            <div class="form-list" id="formList"></div>
+            <div class="outline-list" id="outlineList"></div>
         </aside>
 
         <!-- Center: the question canvas -->
@@ -160,11 +178,23 @@
     <div class="modal" id="newFormModal">
         <div class="modal-content">
             <h2 class="modal-title">New Form</h2>
-            <div class="form-group">
+            <div class="new-form-options">
+                <button class="new-form-option" id="blankFormOption" type="button">
+                    <span class="nfo-icon">📄</span>
+                    <span class="nfo-title">Blank form</span>
+                    <span class="nfo-desc">Start from an empty form</span>
+                </button>
+                <button class="new-form-option" id="generateFormOption" type="button">
+                    <span class="nfo-icon">✨</span>
+                    <span class="nfo-title">Generate with AI</span>
+                    <span class="nfo-desc">Paste a brief — our AI builds the form</span>
+                </button>
+            </div>
+            <div class="form-group" id="newFormNameGroup" style="display:none">
                 <label>Form Name</label>
                 <input type="text" id="newFormName" placeholder="Enter form name">
             </div>
-            <div class="modal-actions">
+            <div class="modal-actions" id="newFormActions" style="display:none">
                 <button class="btn btn-secondary" id="cancelNewForm">Cancel</button>
                 <button class="btn btn-primary" id="confirmNewForm">Create</button>
             </div>

@@ -129,7 +129,6 @@ function showAuthError(msg) {
 async function enterEditor() {
     document.getElementById('authGate').style.display = 'none';
     document.getElementById('topNav').style.display = '';
-    document.getElementById('editorContainer').style.display = '';
     const userBadge = document.getElementById('navUser');
     if (userBadge && currentUser) userBadge.textContent = currentUser.email || '';
 
@@ -141,22 +140,31 @@ async function enterEditor() {
         forms = [];
     }
     renderFormList();
-    if (forms.length === 0) {
-        // Create a default form for new users
-        await createDefaultForm();
-    }
+    showView('home');
 }
 
-async function createDefaultForm() {
-    const newForm = createNewFormData('My First Form');
-    const id = await persistFormToBackend(newForm);
-    if (id) {
-        newForm.id = id;
-        forms.push(newForm);
-        cacheForms();
-        renderFormList();
-        selectForm(id);
-    }
+// Home ↔ editor view switching
+function showView(name) {
+    const home = document.getElementById('homeView');
+    const editor = document.getElementById('editorContainer');
+    const isHome = name === 'home';
+    home.style.display = isHome ? '' : 'none';
+    editor.style.display = isHome ? 'none' : '';
+    document.querySelectorAll('.editor-only').forEach(el => {
+        el.style.display = isHome ? 'none' : '';
+    });
+    if (isHome) window.scrollTo(0, 0);
+}
+
+function openForm(formId) {
+    selectForm(formId);
+    showView('editor');
+}
+
+function backToHome() {
+    saveCurrentFormLocal();
+    renderFormList();
+    showView('home');
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -374,7 +382,9 @@ function setupLayoutToggles() {
 
 function setupEventListeners() {
     bind('newFormBtn', 'click', showNewFormModal);
-    bind('aiFormBtn', 'click', showAiGenerateModal);
+    bind('backHomeBtn', 'click', backToHome);
+    bind('blankFormOption', 'click', () => chooseNewFormMode('blank'));
+    bind('generateFormOption', 'click', () => { hideNewFormModal(); showAiGenerateModal(); });
     bind('cancelAiGenerate', 'click', hideAiGenerateModal);
     bind('confirmAiGenerate', 'click', generateFormWithAi);
     bind('previewBtn', 'click', showPreview);
@@ -422,7 +432,7 @@ function setupEventListeners() {
             const main = e.target.closest('.form-item-main');
             if (main) {
                 const formItem = main.closest('.form-item');
-                if (formItem) selectForm(formItem.dataset.formId);
+                if (formItem) openForm(formItem.dataset.formId);
             }
         });
     }
@@ -492,9 +502,23 @@ function setupDragAndDrop() {
 // ─────────────────────────────────────────────────────────────────────
 
 function showNewFormModal() {
-    document.getElementById('newFormName').value = '';
+    // start at the option chooser each time
+    chooseNewFormMode('options');
     newFormModal.classList.add('active');
-    setTimeout(() => document.getElementById('newFormName').focus(), 100);
+}
+
+function chooseNewFormMode(mode) {
+    const opts = document.querySelector('.new-form-options');
+    const nameGroup = document.getElementById('newFormNameGroup');
+    const actions = document.getElementById('newFormActions');
+    const showingBlank = mode === 'blank';
+    if (opts) opts.style.display = showingBlank ? 'none' : '';
+    if (nameGroup) nameGroup.style.display = showingBlank ? '' : 'none';
+    if (actions) actions.style.display = showingBlank ? '' : 'none';
+    if (showingBlank) {
+        document.getElementById('newFormName').value = '';
+        setTimeout(() => document.getElementById('newFormName').focus(), 100);
+    }
 }
 
 function hideNewFormModal() {
@@ -584,7 +608,7 @@ async function generateFormWithAi() {
         forms.push(newForm);
         cacheForms();
         renderFormList();
-        selectForm(id);
+        openForm(id);
         showToast(`Form "${newForm.name}" generated — ${newForm.questions.length} questions`);
     } catch (e) {
         showAiError((e && e.message) || 'Generation failed. Try again.');
@@ -607,7 +631,7 @@ async function createNewForm() {
     forms.push(newForm);
     cacheForms();
     renderFormList();
-    selectForm(id);
+    openForm(id);
 }
 
 function showDeleteModal(questionId) {
@@ -653,15 +677,15 @@ async function confirmDeleteForm() {
         showToast('Delete failed: ' + (e.message || ''), true);
         return;
     }
+    const wasOpen = currentFormId === formToDelete;
     forms = forms.filter(f => f.id !== formToDelete);
-    if (currentFormId === formToDelete) currentFormId = forms.length > 0 ? forms[0].id : null;
+    if (wasOpen) currentFormId = null;
     formToDelete = null;
     cacheForms();
     document.getElementById('deleteFormModal').classList.remove('active');
     showToast('Form deleted');
     renderFormList();
-    if (currentFormId) selectForm(currentFormId);
-    else renderQuestions();
+    if (wasOpen) showView('home');
 }
 
 function showPreview() {
@@ -978,6 +1002,8 @@ function selectForm(formId) {
     currentFormId = formId;
     const form = getCurrentForm();
     if (!form) return;
+    const nameEl = document.getElementById('navFormName');
+    if (nameEl) nameEl.textContent = form.name || 'Untitled';
     renderFormList();
     formNameInput.value = form.name;
     formDescriptionInput.value = form.description || '';
@@ -1044,6 +1070,24 @@ function deleteQuestion(questionId) {
 
 function renderFormList() {
     formList.replaceChildren();
+    const sub = document.getElementById('homeSubtitle');
+    if (sub) sub.textContent = forms.length === 0 ? 'Create your first form to get started' : `${forms.length} form${forms.length > 1 ? 's' : ''}`;
+
+    if (forms.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'home-empty';
+        const p = document.createElement('p');
+        p.textContent = 'No forms yet — create a blank form or generate one with AI.';
+        empty.appendChild(p);
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-primary';
+        btn.textContent = '+ New Form';
+        btn.addEventListener('click', showNewFormModal);
+        empty.appendChild(btn);
+        formList.appendChild(empty);
+        return;
+    }
+
     forms.forEach(form => {
         const item = document.createElement('div');
         item.className = 'form-item' + (form.id === currentFormId ? ' active' : '');
@@ -1078,8 +1122,6 @@ function renderFormList() {
         formList.appendChild(item);
     });
 
-    if (!currentFormId && forms.length > 0) selectForm(forms[0].id);
-
     // Async refresh of respondent counts
     forms.forEach(async form => {
         if (!form.id) return;
@@ -1093,6 +1135,40 @@ function renderFormList() {
     });
 }
 
+// Outline sidebar: quick nav through the current form's sections/questions
+function renderOutline() {
+    const list = document.getElementById('outlineList');
+    if (!list) return;
+    const form = getCurrentForm();
+    list.replaceChildren();
+    if (!form) return;
+    let qNum = 0;
+    form.questions.forEach((q, i) => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'outline-item' + (q.type === 'section' ? ' outline-section' : '');
+        const label = document.createElement('span');
+        label.className = 'outline-label';
+        label.textContent = q.type === 'section'
+            ? (q.title || 'Section')
+            : `${++qNum}. ${q.title || 'Untitled'}`;
+        item.appendChild(label);
+        item.addEventListener('click', () => {
+            const card = document.getElementById('qcard-' + q.id) || questionsList.children[i];
+            if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            list.querySelectorAll('.outline-item.active').forEach(x => x.classList.remove('active'));
+            item.classList.add('active');
+        });
+        list.appendChild(item);
+    });
+    if (form.questions.length === 0) {
+        const p = document.createElement('p');
+        p.className = 'outline-empty';
+        p.textContent = 'No questions yet';
+        list.appendChild(p);
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // Render: questions
 // ─────────────────────────────────────────────────────────────────────
@@ -1100,6 +1176,7 @@ function renderFormList() {
 function renderQuestions() {
     const form = getCurrentForm();
     questionsList.replaceChildren();
+    renderOutline();
     if (!form) {
         questionsList.appendChild(placeholder('Select a form to edit'));
         return;
@@ -1113,6 +1190,7 @@ function renderQuestions() {
         const item = document.createElement('div');
         item.className = 'question-item' + (q.type === 'section' ? ' section-item' : '');
         item.dataset.id = q.id;
+        item.id = 'qcard-' + q.id;
         item.draggable = true;
         if (q.color) {
             item.style.background = q.color + '15';
