@@ -31,6 +31,9 @@ const previewFrame = document.getElementById('previewFrame');
 const responsesPage = document.getElementById('responsesPage');
 
 document.addEventListener('DOMContentLoaded', init);
+window.addEventListener('pagehide', () => {
+    if (autosaveTimer) { clearTimeout(autosaveTimer); flushAutosave(); }
+});
 
 async function init() {
     if (!window.PocketBase || !API_URL) {
@@ -134,6 +137,7 @@ async function enterEditor() {
 
     setupEventListeners();
     setupLayoutToggles();
+    setupModalBackdropClose();
     try {
         await loadForms();
     } catch (e) {
@@ -163,6 +167,7 @@ function openForm(formId) {
 
 function backToHome() {
     saveCurrentFormLocal();
+    if (autosaveTimer) { clearTimeout(autosaveTimer); flushAutosave(); }
     renderFormList();
     showView('home');
 }
@@ -178,6 +183,7 @@ async function loadForms() {
     });
 
     forms = [];
+    suppressAutosave = true;
     for (const rf of (remoteForms || [])) {
         const questions = await fetchQuestionsForForm(rf.id);
         forms.push({
@@ -190,6 +196,7 @@ async function loadForms() {
             questions
         });
     }
+    suppressAutosave = false;
     cacheForms();
 }
 
@@ -241,6 +248,43 @@ function cacheForms() {
     try {
         localStorage.setItem(`formure_cache_${currentUser.id}`, JSON.stringify(forms));
     } catch (e) {}
+    scheduleAutosave();
+}
+
+// ── Autosave: every change flows through cacheForms, so debounce the
+// remote persist from there. No Save button — edits save themselves.
+let autosaveTimer = null;
+let suppressAutosave = false;
+
+function scheduleAutosave() {
+    if (suppressAutosave) return;
+    if (!pb || !currentUser || !currentFormId) return;
+    const form = getCurrentForm();
+    if (!form || !form.id || String(form.id).startsWith('tmp_')) return;
+    clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(flushAutosave, 900);
+}
+
+async function flushAutosave() {
+    const form = getCurrentForm();
+    if (!form || !form.id || String(form.id).startsWith('tmp_')) return;
+    setSaveStatus('saving');
+    const id = await persistFormToBackend(form);
+    setSaveStatus(id ? 'saved' : 'error');
+}
+
+function setSaveStatus(state) {
+    const el = document.getElementById('saveStatus');
+    if (!el) return;
+    if (state === 'saving') { el.textContent = 'Saving…'; el.className = 'save-status editor-only saving'; }
+    else if (state === 'saved') {
+        el.textContent = '✓ Saved';
+        el.className = 'save-status editor-only saved';
+        setTimeout(() => { if (el.textContent === '✓ Saved') el.textContent = ''; }, 2200);
+    } else if (state === 'error') {
+        el.textContent = '⚠ Save failed — retrying on next edit';
+        el.className = 'save-status editor-only error';
+    }
 }
 
 function createNewFormData(name = 'New Form') {
@@ -294,6 +338,14 @@ function generateShareSlug(length = 7) {
 function bind(id, event, fn) {
     const el = document.getElementById(id);
     if (el) el.addEventListener(event, fn);
+}
+
+// Click outside a modal card dismisses it
+function setupModalBackdropClose() {
+    ['newFormModal', 'aiGenerateModal', 'addQuestionModal', 'deleteModal', 'deleteFormModal'].forEach(id => {
+        const m = document.getElementById(id);
+        if (m) m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); });
+    });
 }
 
 function setupLayoutToggles() {
@@ -387,8 +439,26 @@ function setupEventListeners() {
     bind('generateFormOption', 'click', () => { hideNewFormModal(); showAiGenerateModal(); });
     bind('cancelAiGenerate', 'click', hideAiGenerateModal);
     bind('confirmAiGenerate', 'click', generateFormWithAi);
+    const previewEl = document.getElementById('aiPromptPreview');
+    if (previewEl) previewEl.textContent = AI_PROMPT_TEXT;
+    bind('togglePromptPreview', 'click', e => {
+        e.preventDefault();
+        const p = document.getElementById('aiPromptPreview');
+        if (p) {
+            const show = p.style.display === 'none';
+            p.style.display = show ? 'block' : 'none';
+            document.getElementById('togglePromptPreview').textContent = show ? 'sembunyikan' : 'lihat isinya';
+        }
+    });
+    bind('copyPromptBtn', 'click', () => {
+        navigator.clipboard.writeText(AI_PROMPT_TEXT).then(() => {
+            const b = document.getElementById('copyPromptBtn');
+            const orig = b.innerHTML;
+            b.textContent = '✓ Prompt tersalin';
+            setTimeout(() => { b.innerHTML = orig; }, 1800);
+        });
+    });
     bind('previewBtn', 'click', showPreview);
-    bind('saveBtn', 'click', saveCurrentForm);
     bind('addQuestionBtn', 'click', addQuestion);
     bind('cancelNewForm', 'click', hideNewFormModal);
     bind('confirmNewForm', 'click', createNewForm);
@@ -529,11 +599,30 @@ function hideNewFormModal() {
 // AI form generation
 // ─────────────────────────────────────────────────────────────────────
 
+const AI_PROMPT_TEXT = `Bantu saya menyusun kuesioner online yang akan saya bagikan ke responden.
+
+KONTEKS: [jelaskan tujuan kuesioner, siapa respondennya, dan hal yang ingin diketahui]
+
+Susun kuesioner lengkap dengan ketentuan berikut:
+1. Judul form + deskripsi singkat (1 kalimat).
+2. Layar pembuka: judul sapaan + subjudul singkat.
+3. Kelompokkan pertanyaan ke dalam bagian (A, B, C...) bila perlu.
+4. Setiap pertanyaan salah satu dari jenis ini:
+   - Pilihan ganda (1 jawaban) — tulis semua opsinya, 2-8 opsi
+   - Centang (bisa lebih dari 1 jawaban) — tulis semua opsinya, 2-12 opsi
+   - Isian teks bebas — beri contoh jawaban sebagai placeholder
+5. Total 3-20 pertanyaan. Gunakan bahasa yang sama dengan KONTEKS di atas, kata-katanya natural dan ramah.
+6. Untuk tabel/matriks penilaian per item: JANGAN dipecah jadi satu pertanyaan per baris —jadikan satu pertanyaan centang untuk memilih item, lalu pertanyaan pilihan ganda untuk item terbaik/terburuk, dan satu isian teks untuk catatan.
+7. Tutup dengan layar hasil: ucapan terima kasih singkat.
+
+Setelah saya setuju dengan drafnya, keluarkan VERSI FINAL lengkap dalam satu balasan.`;
+
 function showAiGenerateModal() {
     document.getElementById('aiBrief').value = '';
     showAiError('');
+    const preview = document.getElementById('aiPromptPreview');
+    if (preview) preview.style.display = 'none';
     document.getElementById('aiGenerateModal').classList.add('active');
-    setTimeout(() => document.getElementById('aiBrief').focus(), 100);
 }
 
 function hideAiGenerateModal() {
