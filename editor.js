@@ -12,7 +12,7 @@ let forms = [];
 let currentFormId = null;
 let questionToDelete = null;
 let formToDelete = null;
-const OPTION_KEYS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+const OPTION_KEYS = Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i));
 const COLORS = ['#e53935', '#f57c00', '#fbc02d', '#43a047', '#1e88e5', '#5e35b1', '#d81b60', '#00897b', '#6d4c41', '#546e7a'];
 
 const formList = document.getElementById('formList');

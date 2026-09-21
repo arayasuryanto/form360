@@ -406,7 +406,8 @@ function handleKeydown(e) {
         return;
     }
 
-    const letterMap = { a: 0, b: 1, c: 2, d: 3, e: 4, f: 5, g: 6, h: 7 };
+    const letterMap = {};
+    for (let k = 0; k < 26; k++) letterMap[String.fromCharCode(97 + k)] = k;
     const idx = letterMap[e.key.toLowerCase()];
 
     if (q.type === 'checkbox') {
@@ -620,7 +621,7 @@ function loadQuestion(idx) {
         } else if (q.type === 'checkbox') {
             continueBtn.style.display = '';
             selectedAnswers = [];
-            const labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+            const labels = Array.from({ length: 26 }, (_, k) => String.fromCharCode(65 + k));
             (q.options || []).forEach((opt, i) => {
                 const btn = document.createElement('button');
                 btn.className = btnClass('checkbox-btn');
@@ -662,7 +663,7 @@ function loadQuestion(idx) {
             selectedAnswer = null;
         } else {
             continueBtn.style.display = '';
-            const labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+            const labels = Array.from({ length: 26 }, (_, k) => String.fromCharCode(65 + k));
             (q.options || []).forEach((opt, i) => {
                 const btn = document.createElement('button');
                 btn.className = btnClass('');
