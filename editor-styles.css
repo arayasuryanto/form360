@@ -1801,3 +1801,18 @@
     overflow-y: auto;
     color: var(--text-secondary);
 }
+
+/* Shared-with-you badge on home cards */
+.shared-badge {
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #e8f0fe;
+    color: #1a56b0;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}

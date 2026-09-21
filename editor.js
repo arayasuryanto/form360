@@ -178,7 +178,7 @@ function backToHome() {
 
 async function loadForms() {
     const remoteForms = await pb.collection('forms').getFullList({
-        filter: pb.filter('owner_id = {:ownerId}', { ownerId: currentUser.id }),
+        filter: pb.filter('owner_id = {:ownerId} || shared_with.id ?= {:ownerId}', { ownerId: currentUser.id }),
         sort: 'created_at'
     });
 
@@ -189,6 +189,7 @@ async function loadForms() {
         forms.push({
             id: rf.id,
             slug: rf.slug || null,
+            shared: rf.owner_id !== currentUser.id,
             name: rf.name || 'Untitled',
             description: rf.description || '',
             welcome: { title: rf.welcome_title || 'Hello, Welcome!', subtitle: rf.welcome_subtitle || 'Press Start or Enter to begin' },
@@ -1187,6 +1188,13 @@ function renderFormList() {
         const title = document.createElement('div');
         title.className = 'form-item-title';
         title.textContent = form.name || 'Untitled';
+        if (form.shared) {
+            const badge = document.createElement('span');
+            badge.className = 'shared-badge';
+            badge.textContent = 'shared';
+            badge.title = 'Shared with you by the form owner';
+            title.appendChild(badge);
+        }
         const meta = document.createElement('div');
         meta.className = 'form-item-meta';
         meta.id = 'meta-' + form.id;
