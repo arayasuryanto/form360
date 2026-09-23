@@ -1285,7 +1285,7 @@ function renderFormList() {
                 filter: pb.filter('form_id = {:formId}', { formId: form.id })
             });
             const el = document.getElementById('meta-' + form.id);
-            if (el) el.textContent = `${form.questions.length} questions · ${page.totalItems} respondents`;
+            if (el) el.textContent = `${form.questions.length} questions · ${page.totalItems} respondent${page.totalItems === 1 ? '' : 's'}`;
         } catch (e) {}
     });
 }
