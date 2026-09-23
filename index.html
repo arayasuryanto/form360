@@ -154,15 +154,9 @@
             </div>
             <div class="settings-actions">
                 <button class="btn btn-secondary" id="previewBtn">Preview</button>
-                <button class="btn btn-secondary" id="shareBtn">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-                    </svg>
-                    Share
-                </button>
+                <button class="btn btn-secondary" id="shareBtn">Share</button>
                 <button class="btn respondents-btn" id="respondentsBtn" title="View respondents">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                     <span id="respondentsCount">…</span>
                 </button>
             </div>
@@ -314,10 +308,6 @@
             <div class="respondent-detail" id="respondentDetail" style="display:none">
                 <div class="detail-header" id="respondentDetailHeader"></div>
                 <div class="detail-charts">
-                    <div class="chart-card">
-                        <h4>Answer Distribution</h4>
-                        <canvas id="answerPieChart" width="160" height="160"></canvas>
-                    </div>
                     <div class="chart-card">
                         <h4>Completion Time</h4>
                         <div class="time-stats" id="timeStats"></div>

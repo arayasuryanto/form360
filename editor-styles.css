@@ -1844,3 +1844,28 @@
 }
 
 .respondent-group-head:first-child { margin-top: 0; }
+
+/* Checkbox answers in respondent detail: square chip grid, not a text wall */
+.answer-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.answer-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 10px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: 1.3;
+}
+
+/* Settings actions: compact, wrap instead of bleeding */
+.settings-actions { flex-wrap: wrap; }
+.settings-actions .btn { flex: 1 1 auto; padding: 9px 12px; font-size: 0.85rem; }
+.respondents-btn { flex: 0 1 auto !important; }

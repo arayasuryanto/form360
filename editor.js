@@ -1019,11 +1019,13 @@ async function showRespondentDetail(formId, respondentId) {
     answersContainer.replaceChildren();
     form.questions.forEach((q, i) => {
         let answerText = answersMap[q.id] ?? '-';
-        if (q.type === 'checkbox' && q.options && answerText !== '-') {
-            answerText = answerText.split(',').map(v => {
+        const isCheckbox = q.type === 'checkbox' && q.options && answerText !== '-';
+        const chips = [];
+        if (isCheckbox) {
+            answerText.split(',').forEach(v => {
                 const opt = q.options.find(o => o.value === v);
-                return opt ? opt.text : v;
-            }).join(', ');
+                chips.push(opt ? opt.text : v);
+            });
         } else if (q.type === 'multiple_choice' && q.options && answerText !== '-') {
             const opt = q.options.find(o => o.value === answerText);
             if (opt) answerText = opt.text;
@@ -1035,7 +1037,17 @@ async function showRespondentDetail(formId, respondentId) {
         label.textContent = q.type === 'section' ? 'Section' : `${i + 1}. ${q.title || 'Untitled question'}`;
         const value = document.createElement('div');
         value.className = 'answer-value';
-        value.textContent = q.type === 'section' ? '-' : answerText;
+        if (isCheckbox) {
+            value.className = 'answer-value answer-chips';
+            chips.forEach(c => {
+                const chip = document.createElement('span');
+                chip.className = 'answer-chip';
+                chip.textContent = c;
+                value.appendChild(chip);
+            });
+        } else {
+            value.textContent = q.type === 'section' ? '-' : answerText;
+        }
         item.append(label, value);
         answersContainer.appendChild(item);
     });
@@ -1054,6 +1066,10 @@ async function fetchRespondentMeta(respondentId) {
 
 function renderRespondentCharts(form, respondent) {
     const chartCanvas = document.getElementById('answerPieChart');
+    if (!chartCanvas) {
+        renderRespondentTimeStats(respondent);
+        return;
+    }
     const ctx = chartCanvas.getContext('2d');
     const choiceAnswers = {};
     form.questions.forEach(q => {
@@ -1083,8 +1099,13 @@ function renderRespondentCharts(form, respondent) {
         startAngle += slice;
     });
 
+    renderRespondentTimeStats(respondent);
+}
+
+function renderRespondentTimeStats(respondent) {
     const timeTaken = respondent.timeTaken || 0;
     const timeStats = document.getElementById('timeStats');
+    if (!timeStats) return;
     timeStats.replaceChildren();
     const stat = document.createElement('div');
     stat.className = 'time-stat';
