@@ -864,13 +864,17 @@ function validateFormForShare(form) {
 
 let currentResponsesFormId = null;
 let respondentsOrderCache = [];
+let responsesReturnTo = 'editor';
 
 async function openResponsesPage(formId) {
     const form = forms.find(f => f.id === formId);
     if (!form) return;
     currentResponsesFormId = formId;
+    // remember where to return to — respondents open from Home AND from the editor
+    responsesReturnTo = document.getElementById('homeView').style.display === 'none' ? 'editor' : 'home';
     document.getElementById('respondentsFormName').textContent = form.name;
     document.getElementById('responsesMeta').textContent = `${form.questions.length} questions`;
+    document.getElementById('homeView').style.display = 'none';
     document.getElementById('editorContainer').style.display = 'none';
     document.getElementById('respondentDetail').style.display = 'none';
     responsesPage.style.display = '';
@@ -953,7 +957,7 @@ function renderResponsesStats(form, respondents) {
 
 function closeResponsesPage() {
     responsesPage.style.display = 'none';
-    document.getElementById('editorContainer').style.display = '';
+    showView(responsesReturnTo);
     currentResponsesFormId = null;
 }
 
