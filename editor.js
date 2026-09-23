@@ -472,6 +472,7 @@ function setupEventListeners() {
         });
     });
     bind('previewBtn', 'click', showPreview);
+    bind('respondentsBtn', 'click', () => { if (currentFormId) openResponsesPage(currentFormId); });
     bind('addQuestionBtn', 'click', addQuestion);
     bind('cancelNewForm', 'click', hideNewFormModal);
     bind('confirmNewForm', 'click', createNewForm);
@@ -892,7 +893,24 @@ async function openResponsesPage(formId) {
         return;
     }
 
+    const dayLabel = ts => {
+        const d = new Date(ts), now = new Date();
+        const day = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+        const diff = (day(now) - day(d)) / 86400000;
+        if (diff === 0) return 'Today';
+        if (diff === 1) return 'Yesterday';
+        return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+    };
+    let lastDay = null;
     respondents.forEach((r, i) => {
+        const thisDay = r.created_at ? dayLabel(r.created_at) : null;
+        if (thisDay && thisDay !== lastDay) {
+            lastDay = thisDay;
+            const head = document.createElement('div');
+            head.className = 'respondent-group-head';
+            head.textContent = thisDay;
+            respondentsList.appendChild(head);
+        }
         const item = document.createElement('div');
         item.className = 'respondent-item';
         item.dataset.formId = formId;
@@ -945,7 +963,8 @@ function renderResponsesStats(form, respondents) {
     const total = respondents.length;
     const times = respondents.map(r => r.time_taken).filter(t => typeof t === 'number');
     const avg = times.length ? Math.round(times.reduce((s, t) => s + t, 0) / times.length) : null;
-    const last = respondents[0] && respondents[0].created_at ? new Date(respondents[0].created_at).toLocaleDateString() : '—';
+    const lastRespondent = respondents[respondents.length - 1];
+    const last = lastRespondent && lastRespondent.created_at ? new Date(lastRespondent.created_at).toLocaleDateString() : '—';
     const answeredAll = total === 0 ? '—' : `${Math.round((total / Math.max(1, total)) * 100)}%`;
     stats.append(
         mk(String(total), 'Respondents'),
@@ -1081,9 +1100,10 @@ function renderRespondentCharts(form, respondent) {
 
 async function fetchRespondentsFromBackend(formId) {
     try {
+        // Ascending: #1 is whoever filled first — numbering follows fill order.
         return await pb.collection('responses').getFullList({
             filter: pb.filter('form_id = {:formId}', { formId }),
-            sort: '-created_at'
+            sort: 'created_at'
         });
     } catch (e) { return null; }
 }
@@ -1110,6 +1130,7 @@ function selectForm(formId) {
     if (!form) return;
     const nameEl = document.getElementById('navFormName');
     if (nameEl) nameEl.textContent = form.name || 'Untitled';
+    refreshRespondentsCount();
     renderFormList();
     formNameInput.value = form.name;
     formDescriptionInput.value = form.description || '';
@@ -1246,6 +1267,21 @@ function renderFormList() {
             if (el) el.textContent = `${form.questions.length} questions · ${page.totalItems} respondents`;
         } catch (e) {}
     });
+}
+
+async function refreshRespondentsCount() {
+    const el = document.getElementById('respondentsCount');
+    if (!el || !currentFormId) return;
+    try {
+        const page = await pb.collection('responses').getList(1, 1, {
+            filter: pb.filter('form_id = {:formId}', { formId: currentFormId }),
+            requestKey: null // renderFormList fires the same query — SDK would autocancel this one
+        });
+        el.textContent = `${page.totalItems} respondent${page.totalItems === 1 ? '' : 's'}`;
+    } catch (e) {
+        console.warn('refreshRespondentsCount failed:', e && e.message, e && e.status, e && e.response && e.response.url);
+        el.textContent = '—';
+    }
 }
 
 // Outline sidebar: quick nav through the current form's sections/questions

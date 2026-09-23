@@ -1816,3 +1816,31 @@
     text-transform: uppercase;
     letter-spacing: 0.04em;
 }
+
+/* Respondents button in the settings panel — count, not a plain label */
+.respondents-btn {
+    background: var(--white);
+    color: var(--text-primary);
+    border: 1.5px solid var(--border);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    white-space: nowrap;
+}
+
+.respondents-btn:hover { border-color: var(--text-primary); }
+
+/* Date group headers in the respondents list */
+.respondent-group-head {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    padding: 10px 4px 4px;
+    border-bottom: 1px solid var(--border);
+    margin-top: 6px;
+}
+
+.respondent-group-head:first-child { margin-top: 0; }

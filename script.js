@@ -366,6 +366,12 @@ function saveCurrentAnswer() {
     }
 }
 
+// System standard for open-text answers: at least two words — one-word
+// lazy answers ("yes", "-") can't continue, "yes it is" can.
+function textAnswerValid(v) {
+    return (v || '').trim().split(/\s+/).filter(Boolean).length >= 2;
+}
+
 function setContinueEnabled(on) {
     continueBtn.disabled = !on;
     continueBtn.style.opacity = on ? '1' : '0.5';
@@ -492,7 +498,7 @@ function handleContinue() {
         if (!selectedAnswer) return;
         answers[q.id] = selectedAnswer;
     } else if (q.type === 'text_input') {
-        if (!textValue.trim()) return;
+        if (!textAnswerValid(textValue)) return;
         answers[q.id] = textValue;
     }
 
@@ -604,19 +610,27 @@ function loadQuestion(idx) {
 
             ta.value = answers[q.id] || '';
             textValue = ta.value;
+            const hintEl = wrap.querySelector('.text-input-hint');
+            const syncHint = () => {
+                if (hintEl) {
+                    hintEl.textContent = textValue.trim() && !textAnswerValid(textValue)
+                        ? 'Minimum 2 words · shift ↵ enter for new line'
+                        : 'shift ↵ enter for new line';
+                }
+            };
             ta.addEventListener('input', e => {
                 textValue = e.target.value;
-                setContinueEnabled(!!textValue.trim());
+                setContinueEnabled(textAnswerValid(textValue));
+                syncHint();
             });
             ta.addEventListener('keydown', e => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
-                    if (textValue.trim()) handleContinue();
+                    if (textAnswerValid(textValue)) handleContinue();
                 }
             });
-            if (textValue.trim()) {
-                setContinueEnabled(true);
-            }
+            setContinueEnabled(textAnswerValid(textValue));
+            syncHint();
             setTimeout(() => ta.focus(), 100);
         } else if (q.type === 'checkbox') {
             continueBtn.style.display = '';
