@@ -177,10 +177,22 @@ function backToHome() {
 // ─────────────────────────────────────────────────────────────────────
 
 async function loadForms() {
-    const remoteForms = await pb.collection('forms').getFullList({
-        filter: pb.filter('owner_id = {:ownerId} || shared_with.id ?= {:ownerId}', { ownerId: currentUser.id }),
-        sort: 'created_at'
+    // NOTE: filter uses the denormalized shared_ids text field — PocketBase drops
+    // relation joins the requester can't read (a user can't read other users),
+    // so filtering via shared_with.id returns nothing for the form owner.
+    const ownerFilter = pb.filter('owner_id = {:ownerId} || shared_ids ~ {:quoted}', {
+        ownerId: currentUser.id,
+        quoted: `"${currentUser.id}"`
     });
+    let remoteForms;
+    try {
+        remoteForms = await pb.collection('forms').getFullList({ filter: ownerFilter, sort: 'created_at' });
+    } catch (e) {
+        remoteForms = await pb.collection('forms').getFullList({
+            filter: pb.filter('owner_id = {:ownerId}', { ownerId: currentUser.id }),
+            sort: 'created_at'
+        });
+    }
 
     forms = [];
     suppressAutosave = true;
@@ -1603,7 +1615,6 @@ async function persistFormToBackend(form) {
     if (!pb || !currentUser) return null;
     try {
         const formData = {
-            owner_id: currentUser.id,
             name: form.name || 'New Form',
             description: form.description || '',
             welcome_title: form.welcome.title,
@@ -1617,9 +1628,12 @@ async function persistFormToBackend(form) {
 
         let formId = form.id && !String(form.id).startsWith('tmp_') ? form.id : null;
         if (formId) {
+            // UPDATE: never send owner_id/shared_with — a shared editor's autosave
+            // must not be able to rewrite ownership (this exact bug silently
+            // transferred the MEE form to the shared user on 2026-09-21).
             await pb.collection('forms').update(formId, formData);
         } else {
-            const rec = await pb.collection('forms').create(formData);
+            const rec = await pb.collection('forms').create({ ...formData, owner_id: currentUser.id });
             formId = rec.id;
         }
         if (!form.slug && formData.slug) form.slug = formData.slug;
